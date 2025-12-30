@@ -2,25 +2,26 @@ import './globals.css'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata = {
-  title: 'Harim Team Nexus | 통합 워크스페이스',
-  description: '하림 팀 협업 플랫폼 - 업무관리, 게시판, 일정관리',
+  title: 'Harim Nexus | Future Workspace',
+  description: '팀 협업의 새로운 차원',
 }
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ko">
-      <body suppressHydrationWarning>
-        {children}
+    <html lang="ko" className="dark">
+      <body>
+        <div className="aurora-bg" /> {/* 환상적인 배경 레이어 */}
+        <div className="relative z-10 min-h-screen text-slate-200">
+          {children}
+        </div>
         <Toaster 
           position="bottom-right"
           toastOptions={{
-            duration: 3000,
             style: {
-              background: 'rgba(17, 24, 39, 0.95)',
+              background: 'rgba(30, 41, 59, 0.8)',
+              backdropFilter: 'blur(10px)',
               color: '#fff',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '12px',
-              padding: '16px',
+              border: '1px solid rgba(255,255,255,0.1)',
             },
           }}
         />

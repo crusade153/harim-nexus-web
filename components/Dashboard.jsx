@@ -2,217 +2,193 @@
 import { useMemo } from 'react'
 
 export default function Dashboard({ data, onRefresh }) {
-  const stats = useMemo(() => {
+  // 전체 데이터 요약 계산
+  const summary = useMemo(() => {
     const tasks = data.tasks || []
-    const total = tasks.length
-    const inProgress = tasks.filter(t => t.상태 === '진행중').length
-    const completed = tasks.filter(t => t.상태 === '완료').length
-    const blocked = tasks.filter(t => t.상태 === '중단').length
-    const progress = total ? Math.round((completed / total) * 100) : 0
-
-    return { total, inProgress, completed, blocked, progress }
-  }, [data.tasks])
-
-  const StatCard = ({ title, value, subtitle, icon, gradient, delay }) => (
-    <div 
-      className="glass rounded-2xl p-6 card-hover animate-fadeIn"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>
-          <h3 className="text-4xl font-bold gradient-text">{value}</h3>
-        </div>
-        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-2xl shadow-lg`}>
-          {icon}
-        </div>
-      </div>
-      <p className="text-gray-400 text-sm">{subtitle}</p>
-    </div>
-  )
-
-  const urgentTasks = data.tasks?.filter(t => t.강조표시 === 'TRUE' && t.상태 !== '완료') || []
+    return {
+      totalTasks: tasks.length,
+      progress: tasks.length ? Math.round((tasks.filter(t => t.상태 === '완료').length / tasks.length) * 100) : 0,
+      urgentTasks: tasks.filter(t => t.우선순위 === '높음' && t.상태 !== '완료'),
+      ongoingTasks: tasks.filter(t => t.상태 === '진행중'),
+      recentPosts: data.posts?.slice(0, 3) || [],
+      todaySchedules: data.schedules?.slice(0, 3) || [],
+    }
+  }, [data])
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Banner */}
-      <div className="glass rounded-2xl p-8 bg-gradient-to-r from-purple-600 to-pink-600 text-white animate-fadeIn">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+    <div className="max-w-[1600px] mx-auto space-y-6 pb-10">
+      
+      {/* 1. 상단 헤더 & 검색 (Dashboard 내부에 통합) */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">안녕하세요, Team Nexus! 👋</h1>
+          <p className="text-gray-500 text-sm mt-1">오늘의 업무 현황을 한눈에 확인하세요.</p>
+        </div>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:w-80">
+            <input 
+              type="text" 
+              placeholder="검색..." 
+              className="w-full pl-10 pr-4 py-2.5 rounded-full bg-white border border-gray-200 focus:ring-2 focus:ring-[#d9f99d] focus:border-transparent outline-none transition-all shadow-sm text-sm"
+            />
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+          </div>
+          <button onClick={onRefresh} className="p-2.5 bg-white rounded-full border border-gray-200 hover:bg-gray-50 shadow-sm transition-colors">
+            🔄
+          </button>
+        </div>
+      </div>
+
+      {/* 2. 메인 벤토 그리드 레이아웃 */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+
+        {/* [A] 상단 4개 요약 카드 (GearUp 스타일) */}
+        <div className="md:col-span-3 bento-card p-5 flex flex-col justify-between h-36">
+          <div className="flex justify-between items-start">
+            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-xl">📊</div>
+            <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-full">+2건</span>
+          </div>
           <div>
-            <h1 className="text-3xl lg:text-4xl font-bold mb-2">
-              안녕하세요, 유경덕님! 👋
-            </h1>
-            <p className="text-purple-100 text-lg">
-              오늘도 멋진 하루 되세요! 현재 {stats.inProgress}개의 업무가 진행 중입니다.
-            </p>
-          </div>
-          <button 
-            onClick={onRefresh}
-            className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-all backdrop-blur-sm"
-          >
-            🔄 새로고침
-          </button>
-        </div>
-      </div>
-
-      {/* Urgent Tasks Alert */}
-      {urgentTasks.length > 0 && (
-        <div className="glass rounded-2xl p-6 border-l-4 border-red-500 bg-red-50/50 animate-fadeIn">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-red-500 text-white flex items-center justify-center text-2xl flex-shrink-0">
-              🚨
-            </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-red-900 mb-2">
-                긴급 이슈 {urgentTasks.length}건
-              </h3>
-              <div className="space-y-2">
-                {urgentTasks.map((task, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-white rounded-xl">
-                    <div>
-                      <span className="font-bold text-gray-900">{task.제목}</span>
-                      <span className="text-gray-500 text-sm ml-2">담당: {task.담당자명}</span>
-                    </div>
-                    <span className="text-red-600 font-medium text-sm">
-                      마감: {task.마감일}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <p className="text-gray-500 text-sm font-medium">전체 업무</p>
+            <p className="text-3xl font-bold text-gray-900">{summary.totalTasks}</p>
           </div>
         </div>
-      )}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="전체 업무"
-          value={stats.total}
-          subtitle="등록된 총 업무"
-          icon="📊"
-          gradient="from-blue-500 to-cyan-500"
-          delay={0}
-        />
-        <StatCard
-          title="진행 중"
-          value={stats.inProgress}
-          subtitle="현재 작업 중"
-          icon="⚡"
-          gradient="from-purple-500 to-pink-500"
-          delay={100}
-        />
-        <StatCard
-          title="완료"
-          value={stats.completed}
-          subtitle="처리 완료됨"
-          icon="✅"
-          gradient="from-green-500 to-teal-500"
-          delay={200}
-        />
-        <StatCard
-          title="완료율"
-          value={`${stats.progress}%`}
-          subtitle="주간 달성률"
-          icon="🎯"
-          gradient="from-orange-500 to-red-500"
-          delay={300}
-        />
-      </div>
-
-      {/* Recent Activity */}
-      <div className="glass rounded-2xl p-6 animate-fadeIn">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold gradient-text">최근 활동</h2>
-          <button className="text-purple-600 font-medium hover:text-purple-700 transition-colors">
-            전체 보기 →
-          </button>
+        <div className="md:col-span-3 bento-card p-5 flex flex-col justify-between h-36">
+          <div className="flex justify-between items-start">
+            <div className="w-10 h-10 rounded-full bg-[#ecfccb] flex items-center justify-center text-xl">⚡</div>
+            <span className="bg-[#d9f99d] text-[#3f6212] text-xs font-bold px-2 py-1 rounded-full">Active</span>
+          </div>
+          <div>
+            <p className="text-gray-500 text-sm font-medium">진행 중</p>
+            <p className="text-3xl font-bold text-gray-900">{summary.ongoingTasks.length}</p>
+          </div>
         </div>
-        
-        <div className="space-y-4">
-          {data.tasks?.slice(0, 5).map((task, index) => (
-            <div 
-              key={index}
-              className="flex items-center gap-4 p-4 hover:bg-purple-50 rounded-xl transition-all cursor-pointer group"
-            >
-              <div className={`w-2 h-2 rounded-full ${
-                task.상태 === '완료' ? 'bg-green-500' :
-                task.상태 === '중단' ? 'bg-red-500' :
-                'bg-blue-500'
-              } group-hover:scale-150 transition-transform`} />
-              
-              <div className="flex-1">
-                <h4 className="font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
-                  {task.제목}
-                </h4>
-                <p className="text-sm text-gray-500">
-                  {task.담당자명} · {task.상태}
-                </p>
-              </div>
-              
-              <div className="text-right">
-                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                  task.우선순위 === '높음' ? 'bg-red-100 text-red-700' :
-                  task.우선순위 === '보통' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  {task.우선순위}
-                </span>
-                <p className="text-xs text-gray-400 mt-1">{task.작성일}</p>
-              </div>
-            </div>
-          ))}
+
+        <div className="md:col-span-3 bento-card p-5 flex flex-col justify-between h-36">
+          <div className="flex justify-between items-start">
+            <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-xl">📅</div>
+            <span className="text-gray-400 text-xs">Today</span>
+          </div>
+          <div>
+            <p className="text-gray-500 text-sm font-medium">오늘 일정</p>
+            <p className="text-3xl font-bold text-gray-900">{summary.todaySchedules.length}</p>
+          </div>
+        </div>
+
+        <div className="md:col-span-3 bento-card p-5 flex flex-col justify-between h-36">
+          <div className="flex justify-between items-start">
+            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-xl">🚨</div>
+            <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-1 rounded-full">Urgent</span>
+          </div>
+          <div>
+            <p className="text-gray-500 text-sm font-medium">긴급 이슈</p>
+            <p className="text-3xl font-bold text-gray-900">{summary.urgentTasks.length}</p>
+          </div>
+        </div>
+
+
+        {/* [B] 긴급 업무 리스트 (Kanban Data) */}
+        <div className="md:col-span-8 bento-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+              <span className="w-2 h-6 rounded-full bg-[#d9f99d]"></span>
+              긴급 및 진행 업무
+            </h3>
+            <span className="text-xs text-gray-400 cursor-pointer hover:text-black">전체보기 →</span>
+          </div>
           
-          {(!data.tasks || data.tasks.length === 0) && (
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-6xl mb-4">📭</div>
-              <p className="text-lg font-medium">아직 등록된 업무가 없습니다</p>
-              <p className="text-sm">새 업무를 등록해보세요!</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="glass rounded-2xl p-6 animate-fadeIn">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-2xl">
-              👥
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900">팀원</h3>
-              <p className="text-2xl font-bold gradient-text">{data.members?.length || 0}명</p>
-            </div>
+          <div className="space-y-3">
+            {summary.urgentTasks.concat(summary.ongoingTasks).slice(0, 4).map((task, i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all group">
+                <div className="flex items-center gap-4">
+                  <span className={`w-2 h-2 rounded-full ${task.우선순위 === '높음' ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`} />
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">{task.제목}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">담당: {task.담당자명} · 마감 {task.마감일}</p>
+                  </div>
+                </div>
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
+                  task.상태 === '진행중' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'
+                }`}>
+                  {task.상태}
+                </span>
+              </div>
+            ))}
           </div>
-          <p className="text-sm text-gray-500">활성 팀원 수</p>
         </div>
 
-        <div className="glass rounded-2xl p-6 animate-fadeIn">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center text-2xl">
-              💬
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900">게시글</h3>
-              <p className="text-2xl font-bold gradient-text">{data.posts?.length || 0}개</p>
+        {/* [C] 일정 및 게시판 요약 (Calendar & Board Data) */}
+        <div className="md:col-span-4 bento-card p-6 flex flex-col gap-6">
+          {/* 일정 */}
+          <div>
+            <h3 className="font-bold text-gray-900 mb-4">오늘의 일정</h3>
+            <div className="space-y-3">
+              {summary.todaySchedules.length > 0 ? summary.todaySchedules.map((sch, i) => (
+                <div key={i} className="flex gap-3 items-start">
+                  <div className="w-12 text-xs font-bold text-gray-400 pt-1">{sch.시간 || '09:00'}</div>
+                  <div className="p-2.5 rounded-xl bg-gray-50 flex-1 border-l-2 border-blue-500">
+                    <p className="text-xs font-bold text-gray-800">{sch.내용}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">{sch.유형}</p>
+                  </div>
+                </div>
+              )) : (
+                <p className="text-sm text-gray-400 text-center py-4">등록된 일정이 없습니다.</p>
+              )}
             </div>
           </div>
-          <p className="text-sm text-gray-500">등록된 게시글</p>
+
+          <div className="w-full h-px bg-gray-100 my-1" />
+
+          {/* 게시판 */}
+          <div>
+            <h3 className="font-bold text-gray-900 mb-3">최근 공지</h3>
+            <ul className="space-y-3">
+              {summary.recentPosts.map((post, i) => (
+                <li key={i} className="flex justify-between items-center text-sm group cursor-pointer">
+                  <span className="text-gray-600 group-hover:text-blue-600 truncate flex-1 pr-2">• {post.제목}</span>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">{post.날짜}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
-        <div className="glass rounded-2xl p-6 animate-fadeIn">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-2xl">
-              📅
-            </div>
+        {/* [D] 신규 KPI 관리 (Placeholder) - 인원별 공란 */}
+        <div className="md:col-span-12 bento-card p-8 bg-[#1e1e24] text-white border-none">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="font-bold text-gray-900">일정</h3>
-              <p className="text-2xl font-bold gradient-text">{data.schedules?.length || 0}건</p>
+              <h3 className="font-bold text-xl flex items-center gap-2">
+                <span className="text-2xl">📈</span> KPI 관리
+              </h3>
+              <p className="text-gray-400 text-sm mt-1">2025년도 팀원별 핵심 성과 지표 (개발 예정)</p>
             </div>
+            <button className="px-4 py-2 bg-[#d9f99d] text-black rounded-xl font-bold text-sm hover:bg-[#bef264] transition-colors">
+              + 목표 설정
+            </button>
           </div>
-          <p className="text-sm text-gray-500">예정된 일정</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {data.members?.map((member, i) => (
+              <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-colors">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm" style={{backgroundColor: member.아바타색상}}>
+                    {member.이름[0]}
+                  </div>
+                  <div>
+                    <p className="font-bold">{member.이름}</p>
+                    <p className="text-xs text-gray-400">{member.직위}</p>
+                  </div>
+                </div>
+                {/* 공란 영역 */}
+                <div className="h-24 rounded-xl border-2 border-dashed border-gray-700 flex items-center justify-center">
+                  <span className="text-xs text-gray-600">데이터 없음</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
+
       </div>
     </div>
   )
