@@ -12,31 +12,10 @@
 
 body {
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #f3f4f6;
-  overflow-x: hidden;
+  background: #f9fafb;
+  min-height: 100vh;
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #764ba2 0%, #667eea 100%);
-}
-
-/* Glass Effect */
 .glass {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
@@ -48,10 +27,8 @@ body {
   background: rgba(17, 24, 39, 0.95);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-/* Animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -67,7 +44,6 @@ body {
   animation: fadeIn 0.5s ease-out forwards;
 }
 
-/* Gradient Text */
 .gradient-text {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
@@ -75,7 +51,6 @@ body {
   background-clip: text;
 }
 
-/* Card Hover Effect */
 .card-hover {
   transition: all 0.3s ease;
 }
@@ -85,7 +60,6 @@ body {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
-/* Button Glow */
 .btn-glow {
   box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
   transition: all 0.3s ease;
