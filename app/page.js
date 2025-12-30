@@ -1,27 +1,82 @@
 'use client'
+import { useState, useEffect } from 'react'
+import Sidebar from '@/components/Sidebar'
+import Header from '@/components/Header'
+import Dashboard from '@/components/Dashboard'
+import KanbanBoard from '@/components/KanbanBoard'
+import BoardPage from '@/components/BoardPage'
+import CalendarPage from '@/components/CalendarPage'
+import MembersPage from '@/components/MembersPage'
+import { getSampleData } from '@/lib/sheets'
+import toast from 'react-hot-toast'
 
 export default function Home() {
+  const [currentView, setCurrentView] = useState('dashboard')
+  const [data, setData] = useState({
+    members: [],
+    tasks: [],
+    posts: [],
+    schedules: []
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      // API 설정 전까지 샘플 데이터 사용
+      const sampleData = getSampleData()
+      setData(sampleData)
+      toast.success('데이터 로드 완료!')
+    } catch (error) {
+      console.error('데이터 로드 실패:', error)
+      toast.error('데이터 로드 실패')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const renderView = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-600 font-medium">데이터 로딩 중...</p>
+          </div>
+        </div>
+      )
+    }
+
+    switch (currentView) {
+      case 'dashboard':
+        return <Dashboard data={data} onRefresh={loadData} />
+      case 'kanban':
+        return <KanbanBoard tasks={data.tasks} onRefresh={loadData} />
+      case 'board':
+        return <BoardPage posts={data.posts} onRefresh={loadData} />
+      case 'calendar':
+        return <CalendarPage schedules={data.schedules} onRefresh={loadData} />
+      case 'members':
+        return <MembersPage members={data.members} onRefresh={loadData} />
+      default:
+        return <Dashboard data={data} onRefresh={loadData} />
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-6 shadow-lg">
-          H
+    <div className="min-h-screen flex">
+      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+      
+      <main className="flex-1 lg:ml-64 transition-all duration-300">
+        <Header />
+        <div className="p-4 lg:p-8 animate-fadeIn">
+          {renderView()}
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Harim Team Nexus
-        </h1>
-        <p className="text-gray-600 mb-8">
-          🚀 Enterprise Workspace - Coming Soon
-        </p>
-        <div className="flex gap-4 justify-center">
-          <button className="px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition">
-            시작하기
-          </button>
-          <button className="px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition">
-            더 알아보기
-          </button>
-        </div>
-      </div>
+      </main>
     </div>
   )
 }
