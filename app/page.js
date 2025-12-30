@@ -8,7 +8,6 @@ import BoardPage from '@/components/BoardPage'
 import CalendarPage from '@/components/CalendarPage'
 import MembersPage from '@/components/MembersPage'
 import { getSampleData } from '@/lib/sheets'
-import toast from 'react-hot-toast'
 
 export default function Home() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -27,13 +26,11 @@ export default function Home() {
   const loadData = async () => {
     try {
       setLoading(true)
-      // API 설정 전까지 샘플 데이터 사용
       const sampleData = getSampleData()
       setData(sampleData)
-      toast.success('데이터 로드 완료!')
+      console.log('데이터 로드 완료')
     } catch (error) {
       console.error('데이터 로드 실패:', error)
-      toast.error('데이터 로드 실패')
     } finally {
       setLoading(false)
     }
@@ -68,7 +65,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-gradient-to-br from-purple-50 to-pink-50">
       <Sidebar currentView={currentView} onViewChange={setCurrentView} />
       
       <main className="flex-1 lg:ml-64 transition-all duration-300">
