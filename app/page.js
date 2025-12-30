@@ -28,7 +28,6 @@ export default function Home() {
       setLoading(true)
       const sampleData = getSampleData()
       setData(sampleData)
-      console.log('데이터 로드 완료')
     } catch (error) {
       console.error('데이터 로드 실패:', error)
     } finally {
@@ -41,8 +40,8 @@ export default function Home() {
       return (
         <div className="flex items-center justify-center h-screen">
           <div className="text-center">
-            <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-600 font-medium">데이터 로딩 중...</p>
+            <div className="w-12 h-12 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-500 text-sm font-medium">로딩 중...</p>
           </div>
         </div>
       )
@@ -65,12 +64,12 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-purple-50 to-pink-50">
+    <div className="min-h-screen flex bg-white">
       <Sidebar currentView={currentView} onViewChange={setCurrentView} />
       
-      <main className="flex-1 lg:ml-64 transition-all duration-300">
+      <main className="flex-1 lg:ml-64">
         <Header />
-        <div className="p-4 lg:p-8 animate-fadeIn">
+        <div className="p-6 lg:p-8">
           {renderView()}
         </div>
       </main>
