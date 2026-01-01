@@ -5,28 +5,51 @@
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
 
 body {
-  font-family: 'Pretendard', sans-serif;
-  background-color: #f0f2f5; /* 아주 연한 쿨그레이 배경 (WiseWay 느낌) */
-  color: #1f2937;
+  @apply font-sans bg-slate-50 text-slate-800 antialiased;
 }
 
-/* 🍱 벤토 카드 (GearUp 스타일) */
-.bento-card {
-  @apply bg-white rounded-[24px] border border-white/50 transition-all duration-300;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03); /* 아주 부드러운 그림자 */
+@layer components {
+  /* 🏗️ 공통 카드 스타일 (Clean Style) */
+  .card-base {
+    @apply bg-white border border-slate-200 rounded-xl transition-all duration-200;
+  }
+  
+  .card-hover {
+    @apply hover:border-slate-300 hover:shadow-soft;
+  }
+
+  /* 🔘 공통 버튼 스타일 */
+  .btn-primary {
+    @apply bg-slate-900 text-white px-4 py-2.5 rounded-lg font-medium text-sm 
+           hover:bg-black transition-colors shadow-sm flex items-center justify-center gap-2;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm
+           hover:bg-slate-50 transition-colors flex items-center justify-center gap-2;
+  }
+
+  .btn-ghost {
+    @apply text-slate-500 hover:bg-slate-100 hover:text-slate-900 px-3 py-2 rounded-lg transition-colors;
+  }
+
+  /* 🏷️ 뱃지 스타일 */
+  .badge {
+    @apply px-2.5 py-1 rounded-md text-xs font-semibold inline-flex items-center gap-1;
+  }
 }
 
-.bento-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+/* 스크롤바 커스텀 (크롬/사파리) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-
-/* 상태 표시 뱃지 */
-.status-badge {
-  @apply px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-/* 스크롤바 숨김 */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-300;
 }
