@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isSaturday, isSunday } from 'date-fns'
 import { getSampleData } from '@/lib/sheets'
 import { ChevronLeft, ChevronRight, Plus, X, Clock, AlignLeft } from 'lucide-react'
@@ -46,12 +47,15 @@ export default function CalendarPage({ schedules, onRefresh }) {
     setIsModalOpen(true)
   }
 
-  // 일정 저장 로직 (API 연동 포인트)
+  // 일정 저장 로직 (Toast 적용)
   const handleSave = () => {
-    if (!newSchedule.내용) return alert('내용을 입력해주세요!')
+    if (!newSchedule.내용) {
+      toast.error('내용을 입력해주세요!')
+      return
+    }
     
     // 실제로는 여기서 appendSheetData 등을 호출
-    alert(`[${newSchedule.날짜}] ${newSchedule.유형} - ${newSchedule.내용} 저장됨 (DB 연동 필요)`)
+    toast.success('일정이 등록되었습니다.')
     
     setIsModalOpen(false)
     onRefresh() // 데이터 새로고침

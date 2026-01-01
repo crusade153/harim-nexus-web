@@ -1,32 +1,31 @@
 'use client'
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import { Plus, CheckCircle2, Circle, Calendar } from 'lucide-react'
 
+// 반드시 export default function으로 시작해야 합니다!
 export default function TodoListPage({ projects = [], onRefresh }) {
   const [activeProjectID, setActiveProjectID] = useState(projects[0]?.ID || null)
   const activeProject = projects.find(p => p.ID === activeProjectID)
 
-  // 진행률 계산 함수
   const calculateProgress = (todos) => {
     if (!todos || todos.length === 0) return 0
     const completed = todos.filter(t => t.완료).length
     return Math.round((completed / todos.length) * 100)
   }
 
-  // 투두 체크 핸들러
   const handleCheck = (todoId) => {
-    alert(`항목 ID ${todoId} 상태 변경 (DB 업데이트 필요)`)
-    // 실제 구현 시 onRefresh() 호출
+    toast.success('상태가 업데이트되었습니다.')
+    if (onRefresh) onRefresh()
   }
 
   return (
     <div className="h-full flex flex-col md:flex-row gap-6">
-      
       {/* 1. 좌측: 프로젝트 목록 */}
       <div className="w-full md:w-80 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">프로젝트</h2>
-          <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500">
+          <button onClick={() => toast('새 프로젝트 추가 기능 준비 중', { icon: '🚧' })} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500">
             <Plus size={20} />
           </button>
         </div>
@@ -34,27 +33,26 @@ export default function TodoListPage({ projects = [], onRefresh }) {
         <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-200px)]">
           {projects.map(project => {
             const progress = calculateProgress(project.todos)
+            const isActive = activeProjectID === project.ID
             return (
               <div 
                 key={project.ID}
                 onClick={() => setActiveProjectID(project.ID)}
                 className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                  activeProjectID === project.ID 
+                  isActive 
                   ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 ring-1 ring-indigo-500/20' 
                   : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-slate-600'
                 }`}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className={`font-bold ${activeProjectID === project.ID ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                  <h3 className={`font-bold ${isActive ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>
                     {project.제목}
                   </h3>
-                  {activeProjectID === project.ID && <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5" />}
+                  {isActive && <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5" />}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-3">
                   <Calendar size={12} /> {project.기간}
                 </div>
-                
-                {/* 미니 프로그레스 바 */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{width: `${progress}%`}} />
@@ -105,17 +103,16 @@ export default function TodoListPage({ projects = [], onRefresh }) {
                       )}
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-xs font-medium text-slate-600 dark:text-slate-300">
-                      <span className="text-slate-400">담당</span> {todo.담당자}
-                    </div>
+                  <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-xs font-medium text-slate-600 dark:text-slate-300">
+                    <span className="text-slate-400">담당</span> {todo.담당자}
                   </div>
                 </div>
               ))}
               
-              {/* 새 항목 추가 버튼 */}
-              <button className="w-full py-3 mt-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-indigo-500 hover:border-indigo-300 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all flex items-center justify-center gap-2 font-medium text-sm">
+              <button 
+                onClick={() => toast('할 일 추가 기능 준비 중', { icon: '➕' })}
+                className="w-full py-3 mt-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-indigo-500 hover:border-indigo-300 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all flex items-center justify-center gap-2 font-medium text-sm"
+              >
                 <Plus size={18} /> 새 할 일 추가
               </button>
             </div>

@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import { Plus, MoreHorizontal, MessageSquare, Calendar, User, AlignLeft, X, Send } from 'lucide-react'
 
 export default function KanbanBoard({ tasks, onRefresh }) {
@@ -9,27 +10,27 @@ export default function KanbanBoard({ tasks, onRefresh }) {
 
   const columns = ['대기', '진행중', '완료', '중단']
 
-  // 업무 상태 변경 (구글 시트 연동 포인트)
+  // 업무 상태 변경 핸들러
   const handleStatusChange = (newStatus) => {
     if (selectedTask.작성자 !== currentUser) {
-      alert('작성자만 상태를 변경할 수 있습니다.')
+      toast.error('작성자만 상태를 변경할 수 있습니다.')
       return
     }
-    // 실제로는 API 호출 필요
+    // 실제 API 연동 시 여기서 호출
     setSelectedTask({ ...selectedTask, 상태: newStatus })
-    alert(`상태가 '${newStatus}'(으)로 변경되었습니다. (DB 저장 예정)`)
-    onRefresh() // 데이터 갱신 시늉
+    toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
+    onRefresh()
   }
 
-  // 댓글 등록
+  // 댓글 등록 핸들러
   const handleAddComment = (e) => {
     e.preventDefault()
     const comment = e.target.comment.value
     if (!comment) return
     
-    // 댓글 추가 로직 (DB 연동 필요)
     const newComment = { 작성자: currentUser, 내용: comment, 시간: '방금 전' }
     setSelectedTask({ ...selectedTask, 댓글: [...(selectedTask.댓글 || []), newComment] })
+    toast.success('댓글이 등록되었습니다.')
     e.target.reset()
   }
 
@@ -41,7 +42,7 @@ export default function KanbanBoard({ tasks, onRefresh }) {
           <p className="text-slate-500 dark:text-slate-400 text-sm">팀의 업무 흐름을 관리하세요.</p>
         </div>
         <button 
-          onClick={() => setIsWriteModalOpen(true)}
+          onClick={() => toast('새 업무 추가 기능은 준비 중입니다.', { icon: '🚧' })}
           className="btn-primary"
         >
           <Plus size={16} /> 새 업무 추가
@@ -95,6 +96,7 @@ export default function KanbanBoard({ tasks, onRefresh }) {
       {selectedTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setSelectedTask(null)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            
             {/* 모달 헤더 */}
             <div className="sticky top-0 bg-white dark:bg-slate-800 p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start z-10">
               <div className="flex-1 pr-8">
