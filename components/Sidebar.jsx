@@ -4,14 +4,14 @@ import { useState } from 'react'
 export default function Sidebar({ currentView, onViewChange }) {
   const [isOpen, setIsOpen] = useState(false)
 
-  const menuItems = [
-    { id: 'dashboard', name: '대시보드', icon: '📊' },
-    { id: 'kpi', name: 'KPI 관리', icon: '📈', isNew: true }, // ✨ 신규 메뉴
-    { id: 'kanban', name: '업무보드', icon: '📋' },
-    { id: 'board', name: '게시판', icon: '💬' },
-    { id: 'calendar', name: '일정', icon: '📅' },
-    { id: 'members', name: '팀원', icon: '👥' },
-  ]
+const menuItems = [
+  { id: 'dashboard', name: '대시보드', icon: '📊' },
+  { id: 'kanban', name: '업무보드', icon: '📋' },
+  { id: 'board', name: '게시판', icon: '💬' },
+  { id: 'calendar', name: '일정', icon: '📅' },
+  { id: 'kpi', name: 'KPI 관리', icon: '📈', isNew: true },
+  { id: 'members', name: '팀원', icon: '👥' },
+]
 
   return (
     <>
