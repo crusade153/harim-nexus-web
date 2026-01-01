@@ -1,209 +1,184 @@
 'use client'
-import { useState, useMemo } from 'react'
-import toast from 'react-hot-toast'
+import { useState } from 'react'
+import { Plus, MoreHorizontal, MessageSquare, Calendar, User, AlignLeft, X, Send } from 'lucide-react'
 
 export default function KanbanBoard({ tasks, onRefresh }) {
-  const [filterPriority, setFilterPriority] = useState('all')
   const [selectedTask, setSelectedTask] = useState(null)
+  const [isWriteModalOpen, setIsWriteModalOpen] = useState(false)
+  const currentUser = '유경덕' // 현재 로그인 사용자 가정
 
   const columns = ['대기', '진행중', '완료', '중단']
 
-  const filteredTasks = useMemo(() => {
-    if (filterPriority === 'all') return tasks || []
-    return (tasks || []).filter(t => t.우선순위 === filterPriority)
-  }, [tasks, filterPriority])
+  // 업무 상태 변경 (구글 시트 연동 포인트)
+  const handleStatusChange = (newStatus) => {
+    if (selectedTask.작성자 !== currentUser) {
+      alert('작성자만 상태를 변경할 수 있습니다.')
+      return
+    }
+    // 실제로는 API 호출 필요
+    setSelectedTask({ ...selectedTask, 상태: newStatus })
+    alert(`상태가 '${newStatus}'(으)로 변경되었습니다. (DB 저장 예정)`)
+    onRefresh() // 데이터 갱신 시늉
+  }
 
-  const TaskCard = ({ task }) => (
-    <div
-      onClick={() => setSelectedTask(task)}
-      className="glass rounded-xl p-4 cursor-pointer card-hover group"
-    >
-      <div className="flex items-start justify-between mb-3">
-        <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-          task.우선순위 === '높음' ? 'bg-red-100 text-red-700' :
-          task.우선순위 === '보통' ? 'bg-yellow-100 text-yellow-700' :
-          'bg-gray-100 text-gray-700'
-        }`}>
-          {task.우선순위}
-        </span>
-        {task.강조표시 === 'TRUE' && <span className="text-yellow-400 text-lg">⭐</span>}
-      </div>
-
-      <h4 className="font-bold text-gray-900 mb-2 group-hover:text-purple-600 transition-colors">
-        {task.제목}
-      </h4>
-
-      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-        {task.내용}
-      </p>
-
-      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
-            {task.담당자명?.[0] || '?'}
-          </div>
-          <span className="text-xs text-gray-500">{task.담당자명}</span>
-        </div>
-        {task.마감일 && (
-          <span className="text-xs text-gray-400">
-            📅 {task.마감일}
-          </span>
-        )}
-      </div>
-    </div>
-  )
+  // 댓글 등록
+  const handleAddComment = (e) => {
+    e.preventDefault()
+    const comment = e.target.comment.value
+    if (!comment) return
+    
+    // 댓글 추가 로직 (DB 연동 필요)
+    const newComment = { 작성자: currentUser, 내용: comment, 시간: '방금 전' }
+    setSelectedTask({ ...selectedTask, 댓글: [...(selectedTask.댓글 || []), newComment] })
+    e.target.reset()
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+    <div className="space-y-6 h-full flex flex-col">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold gradient-text mb-2">업무 보드</h1>
-          <p className="text-gray-600">드래그하여 업무 상태를 변경하세요</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">업무 보드</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">팀의 업무 흐름을 관리하세요.</p>
         </div>
-
-        <div className="flex gap-3">
-          <select
-            value={filterPriority}
-            onChange={(e) => setFilterPriority(e.target.value)}
-            className="px-4 py-2 glass rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            <option value="all">전체 우선순위</option>
-            <option value="높음">높음</option>
-            <option value="보통">보통</option>
-            <option value="낮음">낮음</option>
-          </select>
-
-          <button 
-            onClick={() => toast.success('새 업무 추가 기능 준비 중입니다!')}
-            className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all btn-glow"
-          >
-            + 새 업무
-          </button>
-        </div>
+        <button 
+          onClick={() => setIsWriteModalOpen(true)}
+          className="btn-primary"
+        >
+          <Plus size={16} /> 새 업무 추가
+        </button>
       </div>
 
-      {/* Kanban Board */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {columns.map((status) => (
-          <div key={status} className="glass rounded-2xl p-4 min-h-[600px]">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${
-                  status === '중단' ? 'bg-red-500' :
-                  status === '완료' ? 'bg-green-500' :
-                  'bg-blue-500'
-                }`} />
-                <h3 className="font-bold text-gray-900">{status}</h3>
-              </div>
-              <span className="bg-gray-100 px-2 py-1 rounded-full text-xs font-bold text-gray-600">
-                {filteredTasks.filter(t => t.상태 === status).length}
+      {/* 칸반 컬럼 */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-6 overflow-hidden min-h-[600px]">
+        {columns.map(status => (
+          <div key={status} className="flex flex-col h-full bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${status === '완료' ? 'bg-green-500' : status === '중단' ? 'bg-red-500' : 'bg-indigo-500'}`} />
+                {status}
+              </span>
+              <span className="bg-white dark:bg-slate-800 px-2 py-0.5 rounded text-xs font-bold text-slate-500 border border-slate-200 dark:border-slate-700">
+                {tasks.filter(t => t.상태 === status).length}
               </span>
             </div>
-
-            <div className="space-y-3">
-              {filteredTasks
-                .filter(t => t.상태 === status)
-                .map((task, index) => (
-                  <TaskCard key={index} task={task} />
-                ))}
-              
-              {filteredTasks.filter(t => t.상태 === status).length === 0 && (
-                <div className="text-center py-12 text-gray-400">
-                  <div className="text-4xl mb-2">📭</div>
-                  <p className="text-sm">업무 없음</p>
+            
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {tasks.filter(t => t.상태 === status).map(task => (
+                <div 
+                  key={task.ID}
+                  onClick={() => setSelectedTask(task)}
+                  className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 shadow-sm cursor-pointer transition-all group"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      task.우선순위 === '높음' ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                    }`}>{task.우선순위}</span>
+                  </div>
+                  <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{task.제목}</h4>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-50 dark:border-slate-700">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center font-bold text-[10px]">{task.담당자명[0]}</div>
+                      {task.담당자명}
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-slate-400">
+                      <MessageSquare size={12} /> {task.댓글?.length || 0}
+                    </div>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Task Detail Modal */}
+      {/* 업무 상세 모달 */}
       {selectedTask && (
-        <div 
-          onClick={() => setSelectedTask(null)}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
-        >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="glass max-w-2xl w-full rounded-2xl p-8 max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold gradient-text mb-2">
-                  {selectedTask.제목}
-                </h2>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                    selectedTask.우선순위 === '높음' ? 'bg-red-100 text-red-700' :
-                    selectedTask.우선순위 === '보통' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {selectedTask.우선순위}
-                  </span>
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                    selectedTask.상태 === '완료' ? 'bg-green-100 text-green-700' :
-                    selectedTask.상태 === '중단' ? 'bg-red-100 text-red-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {selectedTask.상태}
-                  </span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setSelectedTask(null)}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            {/* 모달 헤더 */}
+            <div className="sticky top-0 bg-white dark:bg-slate-800 p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start z-10">
+              <div className="flex-1 pr-8">
+                <div className="flex items-center gap-3 mb-2">
+                  <select 
+                    value={selectedTask.상태}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    disabled={selectedTask.작성자 !== currentUser}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border appearance-none outline-none cursor-pointer
+                      ${selectedTask.작성자 !== currentUser ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}
+                      bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white`}
+                  >
+                    {columns.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                  <span className="text-xs text-slate-400">작성자: {selectedTask.작성자}</span>
                 </div>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">{selectedTask.제목}</h2>
               </div>
-              <button 
-                onClick={() => setSelectedTask(null)}
-                className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400"><X size={24}/></button>
             </div>
 
-            <div className="space-y-6">
-              <div>
-                <h4 className="font-bold text-gray-700 mb-2">상세 내용</h4>
-                <p className="text-gray-600 leading-relaxed">{selectedTask.내용}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-bold text-gray-700 mb-2">담당자</h4>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
-                      {selectedTask.담당자명?.[0]}
+            <div className="p-6 space-y-8">
+              {/* 속성 정보 */}
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <User size={18} className="text-slate-400" />
+                    <div>
+                      <p className="text-xs text-slate-400 font-bold uppercase">담당자</p>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{selectedTask.담당자명}</p>
                     </div>
-                    <span className="text-gray-900">{selectedTask.담당자명}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Calendar size={18} className="text-slate-400" />
+                    <div>
+                      <p className="text-xs text-slate-400 font-bold uppercase">마감일</p>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{selectedTask.마감일 || '미정'}</p>
+                    </div>
                   </div>
                 </div>
-
-                <div>
-                  <h4 className="font-bold text-gray-700 mb-2">마감일</h4>
-                  <p className="text-gray-900">📅 {selectedTask.마감일 || '미정'}</p>
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                  <p className="text-xs text-slate-400 font-bold uppercase mb-2 flex items-center gap-2"><AlignLeft size={14}/> 상세 내용</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed">
+                    {selectedTask.내용 || '내용이 없습니다.'}
+                  </p>
                 </div>
               </div>
 
-              {selectedTask.중단사유 && (
-                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl">
-                  <h4 className="font-bold text-red-900 mb-2">중단 사유</h4>
-                  <p className="text-red-700">{selectedTask.중단사유}</p>
+              {/* 댓글 섹션 */}
+              <div className="border-t border-slate-100 dark:border-slate-700 pt-6">
+                <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                  <MessageSquare size={18} /> 댓글 및 활동
+                </h3>
+                
+                <div className="space-y-4 mb-6">
+                  {selectedTask.댓글?.length > 0 ? selectedTask.댓글.map((cmt, idx) => (
+                    <div key={idx} className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-300 shrink-0">
+                        {cmt.작성자[0]}
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-700/50 px-4 py-2 rounded-2xl rounded-tl-none">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cmt.작성자}</span>
+                          <span className="text-[10px] text-slate-400">{cmt.시간}</span>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-300">{cmt.내용}</p>
+                      </div>
+                    </div>
+                  )) : (
+                    <p className="text-sm text-slate-400 text-center py-4">아직 댓글이 없습니다.</p>
+                  )}
                 </div>
-              )}
 
-              <div className="flex gap-3 pt-6 border-t border-gray-200">
-                <button 
-                  onClick={() => toast.success('수정 기능 준비 중입니다!')}
-                  className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors"
-                >
-                  수정
-                </button>
-                <button 
-                  onClick={() => toast.success('삭제 기능 준비 중입니다!')}
-                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors"
-                >
-                  삭제
-                </button>
+                <form onSubmit={handleAddComment} className="flex gap-2">
+                  <input 
+                    name="comment"
+                    type="text" 
+                    placeholder="댓글을 입력하세요..." 
+                    className="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
+                  />
+                  <button type="submit" className="p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors">
+                    <Send size={18} />
+                  </button>
+                </form>
               </div>
             </div>
           </div>
