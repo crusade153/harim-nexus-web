@@ -5,51 +5,38 @@
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
 
 body {
-  @apply font-sans bg-slate-50 text-slate-800 antialiased;
+  @apply font-sans bg-slate-50 text-slate-800 antialiased transition-colors duration-200;
+  /* 다크 모드 기본 스타일 */
+  @apply dark:bg-slate-900 dark:text-slate-100;
 }
 
 @layer components {
-  /* 🏗️ 공통 카드 스타일 (Clean Style) */
+  /* 🏗️ 카드 스타일 (다크 모드 대응) */
   .card-base {
     @apply bg-white border border-slate-200 rounded-xl transition-all duration-200;
+    @apply dark:bg-slate-800 dark:border-slate-700;
   }
   
   .card-hover {
     @apply hover:border-slate-300 hover:shadow-soft;
+    @apply dark:hover:border-slate-600 dark:hover:shadow-none;
   }
 
-  /* 🔘 공통 버튼 스타일 */
+  /* 🔘 버튼 스타일 */
   .btn-primary {
     @apply bg-slate-900 text-white px-4 py-2.5 rounded-lg font-medium text-sm 
            hover:bg-black transition-colors shadow-sm flex items-center justify-center gap-2;
+    @apply dark:bg-primary-600 dark:hover:bg-primary-500;
   }
 
   .btn-secondary {
     @apply bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm
            hover:bg-slate-50 transition-colors flex items-center justify-center gap-2;
-  }
-
-  .btn-ghost {
-    @apply text-slate-500 hover:bg-slate-100 hover:text-slate-900 px-3 py-2 rounded-lg transition-colors;
+    @apply dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700;
   }
 
   /* 🏷️ 뱃지 스타일 */
   .badge {
     @apply px-2.5 py-1 rounded-md text-xs font-semibold inline-flex items-center gap-1;
   }
-}
-
-/* 스크롤바 커스텀 (크롬/사파리) */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  @apply bg-slate-200 rounded-full;
-}
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-300;
 }

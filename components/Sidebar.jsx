@@ -5,7 +5,8 @@ import {
   KanbanSquare, 
   MessageSquareText, 
   CalendarDays, 
-  PieChart, 
+  Book, 
+  CheckSquare, 
   Users, 
   Menu, 
   X,
@@ -19,14 +20,14 @@ export default function Sidebar({ currentView, onViewChange }) {
     { id: 'dashboard', name: '대시보드', icon: LayoutDashboard },
     { id: 'kanban', name: '프로젝트', icon: KanbanSquare },
     { id: 'board', name: '게시판', icon: MessageSquareText },
+    { id: 'checklist', name: '월간 마감', icon: CheckSquare, badge: 'D-5' },
+    { id: 'wiki', name: '팀 지식고', icon: Book },
     { id: 'calendar', name: '캘린더', icon: CalendarDays },
-    { id: 'kpi', name: 'KPI 관리', icon: PieChart, badge: 'New' },
     { id: 'members', name: '팀원 관리', icon: Users },
   ]
 
   return (
     <>
-      {/* 📱 모바일 토글 버튼 */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
         className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white border border-slate-200 rounded-lg shadow-sm"
@@ -34,14 +35,12 @@ export default function Sidebar({ currentView, onViewChange }) {
         {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* 🖥️ 사이드바 본문 */}
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-[240px] bg-white border-r border-slate-200 flex flex-col
         transform transition-transform duration-300 ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        
-        {/* 1. 로고 영역 */}
+        {/* 로고 영역 */}
         <div className="h-16 flex items-center px-6 border-b border-slate-100">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-sm">
             N
@@ -52,7 +51,7 @@ export default function Sidebar({ currentView, onViewChange }) {
           </div>
         </div>
 
-        {/* 2. 네비게이션 */}
+        {/* 네비게이션 */}
         <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
           <p className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Menu</p>
           {menuItems.map((item) => {
@@ -78,7 +77,11 @@ export default function Sidebar({ currentView, onViewChange }) {
                   <span>{item.name}</span>
                 </div>
                 {item.badge && (
-                  <span className="bg-red-50 text-red-600 text-[10px] px-1.5 py-0.5 rounded font-bold border border-red-100">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${
+                    item.badge.includes('D-') 
+                      ? 'bg-red-50 text-red-600 border-red-100'
+                      : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                  }`}>
                     {item.badge}
                   </span>
                 )}
@@ -87,7 +90,7 @@ export default function Sidebar({ currentView, onViewChange }) {
           })}
         </nav>
 
-        {/* 3. 하단 프로필 */}
+        {/* 프로필 */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-200">
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
@@ -101,14 +104,6 @@ export default function Sidebar({ currentView, onViewChange }) {
           </div>
         </div>
       </aside>
-
-      {/* 모바일 오버레이 */}
-      {isMobileOpen && (
-        <div 
-          onClick={() => setIsMobileOpen(false)}
-          className="fixed inset-0 bg-slate-900/20 z-30 lg:hidden backdrop-blur-sm"
-        />
-      )}
     </>
   )
 }

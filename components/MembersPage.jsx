@@ -1,151 +1,101 @@
 'use client'
+import { Mail, Phone, MoreHorizontal, Briefcase, Calendar } from 'lucide-react'
 
 export default function MembersPage({ members, onRefresh }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold gradient-text mb-2">팀원 관리</h1>
-          <p className="text-gray-600">우리 팀원들을 소개합니다</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">팀원 관리</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">총 {members?.length || 0}명의 팀원이 함께하고 있습니다.</p>
         </div>
         <button 
           onClick={onRefresh}
-          className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all btn-glow"
+          className="btn-secondary"
         >
-          🔄 새로고침
+          데이터 동기화
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {members?.map((member, index) => (
           <div 
             key={index}
-            className="glass rounded-2xl p-6 card-hover animate-fadeIn"
-            style={{ animationDelay: `${index * 50}ms` }}
+            className="card-base p-6 group relative hover:-translate-y-1 transition-transform duration-300"
           >
-            <div className="flex flex-col items-center mb-4">
-              <div 
-                className="w-20 h-20 rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-lg mb-3"
-                style={{ 
-                  background: `linear-gradient(135deg, ${member.아바타색상 || '#667eea'} 0%, ${member.아바타색상 || '#764ba2'} 100%)` 
-                }}
-              >
-                {member.이름?.[0] || '?'}
+            {/* 우측 상단 옵션 버튼 */}
+            <button className="absolute top-4 right-4 text-slate-300 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300">
+              <MoreHorizontal size={20} />
+            </button>
+
+            {/* 프로필 헤더 */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 text-2xl font-bold mb-4 border-4 border-white dark:border-slate-800 shadow-sm">
+                {member.이름[0]}
               </div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{member.이름}</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{member.직위} · {member.부서}</p>
               
-              <h3 className="text-xl font-bold text-gray-900 mb-1">
-                {member.이름}
-              </h3>
-              <p className="text-sm text-gray-500 mb-1">
-                {member.직위} · {member.부서}
-              </p>
-              
-              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                member.권한 === 'admin' 
-                  ? 'bg-red-100 text-red-700' 
-                  : 'bg-blue-100 text-blue-700'
+              {/* 상태 표시 */}
+              <div className={`mt-3 px-3 py-1 rounded-full text-xs font-medium border flex items-center gap-1.5 ${
+                member.상태 === '온라인' ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' :
+                member.상태 === '자리비움' ? 'bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800' :
+                'bg-slate-50 text-slate-600 border-slate-100 dark:bg-slate-700 dark:text-slate-400 dark:border-slate-600'
               }`}>
-                {member.권한 === 'admin' ? '관리자' : '팀원'}
-              </span>
-            </div>
-
-            <div className="space-y-2 border-t border-gray-100 pt-4">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400">📧</span>
-                <span className="text-gray-600 truncate">{member.이메일}</span>
-              </div>
-              
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400">💼</span>
-                <span className="text-gray-600">{member.전문분야}</span>
-              </div>
-              
-              <div className="pt-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-gray-500">업무 부하</span>
-                  <span className="text-xs font-bold text-purple-600">{member.업무부하}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full ${
-                      member.업무부하 >= 80 ? 'bg-red-500' :
-                      member.업무부하 >= 60 ? 'bg-yellow-500' :
-                      'bg-green-500'
-                    }`}
-                    style={{ width: `${member.업무부하}%` }}
-                  />
-                </div>
+                <div className={`w-1.5 h-1.5 rounded-full ${
+                  member.상태 === '온라인' ? 'bg-green-500' : 
+                  member.상태 === '자리비움' ? 'bg-yellow-500' : 'bg-slate-400'
+                }`} />
+                {member.상태}
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
-              <button 
-                onClick={() => alert(`${member.이름}님에게 메시지 보내기`)}
-                className="flex-1 px-3 py-2 bg-purple-50 text-purple-600 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors"
-              >
-                💬 메시지
+            {/* 정보 그리드 */}
+            <div className="space-y-3 border-t border-slate-100 dark:border-slate-700 pt-4">
+              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
+                <Mail size={16} className="text-slate-400" />
+                <span className="truncate">{member.이메일}</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
+                <Calendar size={16} className="text-slate-400" />
+                <span>입사일: {member.입사일 || '-'}</span>
+              </div>
+            </div>
+
+            {/* 업무 부하 */}
+            <div className="mt-5">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">업무 부하</span>
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{member.업무부하}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                  style={{ width: `${member.업무부하}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 스킬 태그 */}
+            <div className="mt-5 flex flex-wrap gap-2">
+              {member.스킬?.map((skill, i) => (
+                <span key={i} className="px-2 py-1 rounded-md bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 text-xs font-medium border border-slate-100 dark:border-slate-600">
+                  {skill}
+                </span>
+              ))}
+            </div>
+
+            {/* 액션 버튼 */}
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button className="btn-secondary py-2 text-xs">
+                프로필
               </button>
-              <button 
-                onClick={() => alert(`${member.이름}님의 프로필 보기`)}
-                className="flex-1 px-3 py-2 bg-gray-50 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
-              >
-                👤 프로필
+              <button className="btn-primary py-2 text-xs">
+                메시지
               </button>
             </div>
           </div>
         ))}
-      </div>
-
-      {(!members || members.length === 0) && (
-        <div className="text-center py-20">
-          <div className="text-6xl mb-4">👥</div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">팀원이 없습니다</h3>
-          <p className="text-gray-600">팀원을 추가해보세요!</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-        <div className="glass rounded-2xl p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-2xl">
-              👥
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">총 팀원</p>
-              <p className="text-3xl font-bold gradient-text">{members?.length || 0}명</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="glass rounded-2xl p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center text-2xl">
-              ⚡
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">평균 업무 부하</p>
-              <p className="text-3xl font-bold gradient-text">
-                {members?.length > 0 
-                  ? Math.round(members.reduce((sum, m) => sum + parseFloat(m.업무부하 || 0), 0) / members.length)
-                  : 0}%
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="glass rounded-2xl p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-2xl">
-              🎯
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">관리자</p>
-              <p className="text-3xl font-bold gradient-text">
-                {members?.filter(m => m.권한 === 'admin').length || 0}명
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   )
