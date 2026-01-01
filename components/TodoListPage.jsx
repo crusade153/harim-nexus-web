@@ -3,7 +3,6 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Plus, CheckCircle2, Circle, Calendar } from 'lucide-react'
 
-// 반드시 export default function으로 시작해야 합니다!
 export default function TodoListPage({ projects = [], onRefresh }) {
   const [activeProjectID, setActiveProjectID] = useState(projects[0]?.ID || null)
   const activeProject = projects.find(p => p.ID === activeProjectID)
@@ -15,17 +14,18 @@ export default function TodoListPage({ projects = [], onRefresh }) {
   }
 
   const handleCheck = (todoId) => {
-    toast.success('상태가 업데이트되었습니다.')
+    toast.success('상태가 업데이트되었습니다. (DB 연동 필요)')
     if (onRefresh) onRefresh()
   }
 
   return (
     <div className="h-full flex flex-col md:flex-row gap-6">
+      
       {/* 1. 좌측: 프로젝트 목록 */}
       <div className="w-full md:w-80 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">프로젝트</h2>
-          <button onClick={() => toast('새 프로젝트 추가 기능 준비 중', { icon: '🚧' })} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500">
+          <button onClick={() => toast('새 프로젝트 추가 기능 준비 중', { icon: '🚧' })} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors">
             <Plus size={20} />
           </button>
         </div>
@@ -53,6 +53,7 @@ export default function TodoListPage({ projects = [], onRefresh }) {
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-3">
                   <Calendar size={12} /> {project.기간}
                 </div>
+                
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{width: `${progress}%`}} />
@@ -103,8 +104,11 @@ export default function TodoListPage({ projects = [], onRefresh }) {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-xs font-medium text-slate-600 dark:text-slate-300">
-                    <span className="text-slate-400">담당</span> {todo.담당자}
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-xs font-medium text-slate-600 dark:text-slate-300">
+                      <span className="text-slate-400">담당</span> {todo.담당자}
+                    </div>
                   </div>
                 </div>
               ))}
