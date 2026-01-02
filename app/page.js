@@ -1,12 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { AlertTriangle, RefreshCcw } from 'lucide-react'
 
-// 컴포넌트 임포트 (경로/파일명 정확해야 함)
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import Skeleton from '@/components/Skeleton' // 위에서 만든 파일 필수!
+import Skeleton from '@/components/Skeleton'
 
 import Dashboard from '@/components/Dashboard'
 import KanbanBoard from '@/components/KanbanBoard'
@@ -14,14 +13,19 @@ import TodoListPage from '@/components/TodoListPage'
 import ArchivePage from '@/components/ArchivePage'
 import CalendarPage from '@/components/CalendarPage'
 import MembersPage from '@/components/MembersPage'
+import BoardPage from '@/components/BoardPage'
+
 import { getSampleData } from '@/lib/sheets'
 
 export default function Home() {
   const [currentView, setCurrentView] = useState('dashboard')
+  const [searchTerm, setSearchTerm] = useState('') // ✅ [추가] 검색어 상태
   
   const [data, setData] = useState({
+    currentUser: null, // ✅ [추가] 사용자 정보 포함
     members: [], tasks: [], projects: [], archives: [],
-    schedules: [], holidays: [], quickLinks: [], activities: []
+    schedules: [], holidays: [], quickLinks: [], activities: [],
+    posts: []
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -32,10 +36,7 @@ export default function Home() {
     try {
       setLoading(true)
       setError(null)
-      
-      // 로딩 효과를 위한 인위적 지연 (0.5초)
       await new Promise(resolve => setTimeout(resolve, 500))
-      
       const sampleData = getSampleData()
       setData(sampleData)
     } catch (err) {
@@ -47,11 +48,25 @@ export default function Home() {
     }
   }
 
+  // ✅ [추가] 검색 로직 (Client-side Search)
+  const filteredData = useMemo(() => {
+    if (!searchTerm.trim()) return data
+
+    const lowerTerm = searchTerm.toLowerCase()
+    
+    // 각 데이터 배열 필터링
+    return {
+      ...data,
+      tasks: data.tasks.filter(t => t.제목.toLowerCase().includes(lowerTerm) || t.담당자명.includes(lowerTerm)),
+      posts: data.posts.filter(p => p.제목.toLowerCase().includes(lowerTerm) || p.내용.toLowerCase().includes(lowerTerm)),
+      archives: data.archives.filter(a => a.제목.toLowerCase().includes(lowerTerm)),
+      projects: data.projects.filter(p => p.제목.toLowerCase().includes(lowerTerm))
+    }
+  }, [data, searchTerm])
+
   const renderView = () => {
-    // 1. 로딩 중일 때 Skeleton 표시 (여기서 Skeleton 파일이 없으면 에러남)
     if (loading) return <Skeleton />
 
-    // 2. 에러 발생 시
     if (error) {
       return (
         <div className="h-[70vh] flex flex-col items-center justify-center text-slate-400">
@@ -65,22 +80,24 @@ export default function Home() {
       )
     }
 
-    // 3. 정상 렌더링
+    // ✅ [변경] 필터링된 데이터(filteredData)와 사용자 정보(currentUser) 전달
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard data={data} onRefresh={loadData} />
+        return <Dashboard data={filteredData} onRefresh={loadData} />
       case 'kanban':
-        return <KanbanBoard tasks={data.tasks} onRefresh={loadData} />
+        return <KanbanBoard tasks={filteredData.tasks} onRefresh={loadData} />
       case 'todos':
-        return <TodoListPage projects={data.projects} onRefresh={loadData} />
+        return <TodoListPage projects={filteredData.projects} onRefresh={loadData} />
+      case 'board': 
+        return <BoardPage posts={filteredData.posts} currentUser={data.currentUser} onRefresh={loadData} />
       case 'archive':
-        return <ArchivePage archives={data.archives} onRefresh={loadData} />
+        return <ArchivePage archives={filteredData.archives} onRefresh={loadData} />
       case 'calendar':
-        return <CalendarPage schedules={data.schedules} onRefresh={loadData} />
+        return <CalendarPage schedules={filteredData.schedules} onRefresh={loadData} />
       case 'members':
         return <MembersPage members={data.members} tasks={data.tasks} projects={data.projects} onRefresh={loadData} />
       default:
-        return <Dashboard data={data} onRefresh={loadData} />
+        return <Dashboard data={filteredData} onRefresh={loadData} />
     }
   }
 
@@ -89,7 +106,7 @@ export default function Home() {
       <Sidebar currentView={currentView} onViewChange={setCurrentView} />
       
       <main className="flex-1 lg:ml-[240px] flex flex-col min-h-screen">
-        <Header />
+        <Header onSearchChange={setSearchTerm} /> {/* ✅ 검색 핸들러 연결 */}
         <div className="flex-1 p-6 lg:p-8 max-w-[1920px] mx-auto w-full">
           {renderView()}
         </div>

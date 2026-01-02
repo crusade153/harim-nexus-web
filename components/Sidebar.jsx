@@ -1,15 +1,16 @@
 'use client'
 import { useState } from 'react'
-import { LayoutDashboard, KanbanSquare, CheckSquare, Archive, CalendarDays, Users, Menu, X, LogOut } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, CheckSquare, Archive, CalendarDays, Users, Menu, X, LogOut, Megaphone } from 'lucide-react'
 
 export default function Sidebar({ currentView, onViewChange }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
   const menuItems = [
     { id: 'dashboard', name: '대시보드', icon: LayoutDashboard },
-    { id: 'kanban', name: '업무 보드', icon: KanbanSquare }, // "프로젝트" -> "업무 보드" (Tasks)
-    { id: 'todos', name: '프로젝트 & To-Do', icon: CheckSquare, badge: 'Action' }, // "체크리스트" -> "프로젝트"
-    { id: 'archive', name: '팀 아카이브', icon: Archive }, // "위키" -> "아카이브"
+    { id: 'kanban', name: '업무 보드', icon: KanbanSquare }, 
+    { id: 'todos', name: '프로젝트 & To-Do', icon: CheckSquare, badge: 'Action' }, 
+    { id: 'board', name: '게시판 & 이슈', icon: Megaphone, badge: 'New' }, // 메뉴 추가됨
+    { id: 'archive', name: '팀 아카이브', icon: Archive }, 
     { id: 'calendar', name: '캘린더', icon: CalendarDays },
     { id: 'members', name: '팀원 관리', icon: Users },
   ]
@@ -20,7 +21,7 @@ export default function Sidebar({ currentView, onViewChange }) {
         {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* 다크모드 대응 클래스 추가 (dark:bg-slate-900, dark:border-slate-800) */}
+      {/* 다크모드 대응 클래스 추가 */}
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-[240px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col
         transform transition-transform duration-300 ease-in-out
