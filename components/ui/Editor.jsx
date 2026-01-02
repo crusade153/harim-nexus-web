@@ -48,6 +48,7 @@ export default function Editor({ content, onChange, editable = true }) {
     ],
     content: content,
     editable: editable,
+    immediatelyRender: false, // ✅ [수정] SSR Hydration 에러 방지 옵션 추가
     editorProps: {
       attributes: {
         class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[150px] p-4 text-sm leading-relaxed text-slate-700 dark:text-slate-200'
