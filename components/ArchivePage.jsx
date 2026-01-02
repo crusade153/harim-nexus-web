@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Archive, Link as LinkIcon, ExternalLink, MessageSquare, Plus, X, AlignLeft, Tag } from 'lucide-react'
+import Editor from '@/components/ui/Editor' // 새로 만든 Editor 임포트
 
 export default function ArchivePage({ archives = [], onRefresh }) {
   const [selectedDoc, setSelectedDoc] = useState(archives[0] || null)
@@ -14,6 +15,7 @@ export default function ArchivePage({ archives = [], onRefresh }) {
       toast.error('제목을 입력해주세요!')
       return
     }
+    // 내용 검증 (HTML 태그 제거 후 길이 체크 등은 생략)
     toast.success('문서가 저장되었습니다! (DB 연동 필요)')
     setIsModalOpen(false)
     setNewArchive({ 카테고리: '매뉴얼', 제목: '', 링크: '', 내용: '' })
@@ -33,7 +35,7 @@ export default function ArchivePage({ archives = [], onRefresh }) {
           </button>
         </div>
 
-        <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-200px)]">
+        <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-200px)] custom-scrollbar">
           {archives.map(doc => {
             const isSelected = selectedDoc?.ID === doc.ID
             return (
@@ -62,7 +64,7 @@ export default function ArchivePage({ archives = [], onRefresh }) {
       </div>
 
       {/* 2. 우측: 상세 보기 */}
-      <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 overflow-y-auto shadow-sm h-[calc(100vh-140px)]">
+      <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 overflow-y-auto shadow-sm h-[calc(100vh-140px)] custom-scrollbar">
         {selectedDoc ? (
           <div className="max-w-3xl mx-auto animate-in fade-in duration-300">
             <div className="flex items-center gap-2 mb-4">
@@ -74,6 +76,7 @@ export default function ArchivePage({ archives = [], onRefresh }) {
             
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-6 leading-tight">{selectedDoc.제목}</h1>
             
+            {/* 관련 링크 (Optional) */}
             {selectedDoc.링크 && (
               <a href={selectedDoc.링크} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl mb-8 group hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
                 <div className="p-2.5 bg-white dark:bg-slate-800 rounded-lg text-indigo-600 shadow-sm border border-slate-100 dark:border-slate-700"><LinkIcon size={20}/></div>
@@ -85,10 +88,13 @@ export default function ArchivePage({ archives = [], onRefresh }) {
               </a>
             )}
 
-            <div className="prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed mb-10 pb-10 border-b border-slate-100 dark:border-slate-700">
-              {selectedDoc.내용}
-            </div>
+            {/* 본문 내용 (HTML 렌더링) */}
+            <div 
+              className="prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 mb-10 pb-10 border-b border-slate-100 dark:border-slate-700"
+              dangerouslySetInnerHTML={{ __html: selectedDoc.내용 }} 
+            />
 
+            {/* 댓글 영역 */}
             <div>
               <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                 <MessageSquare size={18}/> 댓글 ({selectedDoc.댓글?.length || 0})
@@ -126,24 +132,48 @@ export default function ArchivePage({ archives = [], onRefresh }) {
       {/* 새 문서 추가 모달 */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-700">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-700 shrink-0">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">새 지식 추가</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20} /></button>
             </div>
-            <div className="p-6 space-y-5">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase flex items-center gap-1"><Tag size={12}/> 카테고리</label>
-                <div className="flex gap-2">
-                  {categories.map(cat => (
-                    <button key={cat} onClick={() => setNewArchive({...newArchive, 카테고리: cat})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${newArchive.카테고리 === cat ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-50'}`}>{cat}</button>
-                  ))}
+            
+            <div className="p-6 space-y-5 overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase flex items-center gap-1"><Tag size={12}/> 카테고리</label>
+                  <select 
+                    value={newArchive.카테고리} 
+                    onChange={(e) => setNewArchive({...newArchive, 카테고리: e.target.value})}
+                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                  >
+                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase flex items-center gap-1"><LinkIcon size={12}/> 관련 링크 (선택)</label>
+                  <input type="text" value={newArchive.링크} onChange={(e) => setNewArchive({...newArchive, 링크: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="https://..." />
                 </div>
               </div>
-              <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase">제목</label><input type="text" value={newArchive.제목} onChange={(e) => setNewArchive({...newArchive, 제목: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="예: 월말 결산 가이드" /></div>
-              <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase flex items-center gap-1"><LinkIcon size={12}/> 관련 링크</label><input type="text" value={newArchive.링크} onChange={(e) => setNewArchive({...newArchive, 링크: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="https://..." /></div>
-              <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase flex items-center gap-1"><AlignLeft size={12}/> 내용</label><textarea value={newArchive.내용} onChange={(e) => setNewArchive({...newArchive, 내용: e.target.value})} className="w-full h-32 px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white resize-none" placeholder="내용을 입력하세요..." /></div>
-              <div className="flex gap-3 pt-2"><button onClick={() => setIsModalOpen(false)} className="flex-1 btn-secondary">취소</button><button onClick={handleSave} className="flex-1 btn-primary">저장</button></div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase">제목</label>
+                <input type="text" value={newArchive.제목} onChange={(e) => setNewArchive({...newArchive, 제목: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="예: 월말 결산 가이드" />
+              </div>
+
+              {/* 📌 [변경된 부분] 리치 텍스트 에디터 적용 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase flex items-center gap-1"><AlignLeft size={12}/> 내용</label>
+                <Editor 
+                  content={newArchive.내용} 
+                  onChange={(html) => setNewArchive({...newArchive, 내용: html})} 
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-6 pt-2 border-t border-slate-100 dark:border-slate-700 shrink-0">
+              <button onClick={() => setIsModalOpen(false)} className="flex-1 btn-secondary">취소</button>
+              <button onClick={handleSave} className="flex-1 btn-primary">저장</button>
             </div>
           </div>
         </div>
