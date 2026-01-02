@@ -15,7 +15,7 @@ const MenuBar = ({ editor }) => {
   const setLink = () => {
     const previousUrl = editor.getAttributes('link').href
     const url = window.prompt('URL', previousUrl)
-    if (url === null) return // 취소됨
+    if (url === null) return
     if (url === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run()
       return
@@ -57,6 +57,9 @@ export default function Editor({ content, onChange, editable = true }) {
       onChange(editor.getHTML())
     }
   })
+
+  // 에디터가 로드되지 않았을 때 안전하게 null 반환
+  if (!editor) return null
 
   return (
     <div className={`border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900 transition-colors focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 ${!editable ? 'border-none bg-transparent' : ''}`}>

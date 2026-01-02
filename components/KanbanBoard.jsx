@@ -1,8 +1,8 @@
 'use client'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, MessageSquare, Calendar, User, AlignLeft, Send, CheckCircle2, X } from 'lucide-react'
-import Drawer from '@/components/ui/Drawer' // ⭐ Drawer를 불러오는지 확인!
+import { Plus, MessageSquare, Calendar, User, AlignLeft, Send, CheckCircle2 } from 'lucide-react'
+import Drawer from '@/components/ui/Drawer' 
 
 export default function KanbanBoard({ tasks, onRefresh }) {
   const [selectedTask, setSelectedTask] = useState(null)
@@ -14,11 +14,9 @@ export default function KanbanBoard({ tasks, onRefresh }) {
       toast.error('작성자만 상태를 변경할 수 있습니다.')
       return
     }
-    // 상태 변경 로직 (API 연동 시 수정)
     const updatedTask = { ...selectedTask, 상태: newStatus }
     setSelectedTask(updatedTask)
     toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
-    // 실제 앱에서는 여기서 onRefresh() 호출
   }
 
   const handleAddComment = (e) => {
@@ -56,7 +54,7 @@ export default function KanbanBoard({ tasks, onRefresh }) {
               </span>
             </div>
             
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
               {tasks.filter(t => t.상태 === status).map(task => (
                 <div 
                   key={task.ID}
@@ -86,12 +84,7 @@ export default function KanbanBoard({ tasks, onRefresh }) {
         ))}
       </div>
 
-      {/* ⭐ Drawer 컴포넌트가 모달 대신 뜹니다 */}
-      <Drawer
-        isOpen={!!selectedTask}
-        onClose={() => setSelectedTask(null)}
-        title="업무 상세 정보"
-      >
+      <Drawer isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="업무 상세 정보">
         {selectedTask && (
           <div className="space-y-8">
             <div>
@@ -100,9 +93,7 @@ export default function KanbanBoard({ tasks, onRefresh }) {
                   value={selectedTask.상태}
                   onChange={(e) => handleStatusChange(e.target.value)}
                   disabled={selectedTask.작성자 !== currentUser}
-                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border appearance-none outline-none cursor-pointer transition-colors
-                    ${selectedTask.작성자 !== currentUser ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}
-                    bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white`}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border appearance-none outline-none cursor-pointer transition-colors bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white`}
                 >
                   {columns.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
@@ -114,10 +105,7 @@ export default function KanbanBoard({ tasks, onRefresh }) {
             <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
               <div className="space-y-1">
                 <p className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1"><User size={12}/> 담당자</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">{selectedTask.담당자명[0]}</div>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{selectedTask.담당자명}</span>
-                </div>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{selectedTask.담당자명}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1"><Calendar size={12}/> 마감일</p>
@@ -134,40 +122,25 @@ export default function KanbanBoard({ tasks, onRefresh }) {
 
             <div className="border-t border-slate-100 dark:border-slate-700 pt-6">
               <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <MessageSquare size={18} /> 활동 및 댓글 ({selectedTask.댓글?.length || 0})
+                <MessageSquare size={18} /> 댓글 및 활동 ({selectedTask.댓글?.length || 0})
               </h3>
-              
               <div className="space-y-4 mb-6">
-                {selectedTask.댓글?.length > 0 ? selectedTask.댓글.map((cmt, idx) => (
+                {selectedTask.댓글?.map((cmt, idx) => (
                   <div key={idx} className="flex gap-3 group">
-                    <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-400 shrink-0 mt-1">
-                      {cmt.작성자[0]}
-                    </div>
+                    <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-400 shrink-0 mt-1">{cmt.작성자[0]}</div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cmt.작성자}</span>
                         <span className="text-[10px] text-slate-400">{cmt.시간}</span>
                       </div>
-                      <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-3 rounded-lg rounded-tl-none leading-relaxed">
-                        {cmt.내용}
-                      </p>
+                      <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-3 rounded-lg rounded-tl-none">{cmt.내용}</p>
                     </div>
                   </div>
-                )) : (
-                  <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 dark:bg-slate-800/30 rounded-lg">아직 작성된 댓글이 없습니다.</p>
-                )}
+                ))}
               </div>
-
               <form onSubmit={handleAddComment} className="relative">
-                <input 
-                  name="comment"
-                  type="text" 
-                  placeholder="댓글을 입력하세요... (@멘션 가능)" 
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-4 pr-12 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white transition-all"
-                />
-                <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
-                  <Send size={14} />
-                </button>
+                <input name="comment" type="text" placeholder="댓글을 입력하세요..." className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-4 pr-12 py-3 text-sm outline-none dark:text-white" />
+                <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"><Send size={14} /></button>
               </form>
             </div>
           </div>
