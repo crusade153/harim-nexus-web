@@ -1,11 +1,18 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, Bell, Settings, Moon, Sun } from 'lucide-react'
 
-// ✅ [변경] onSearchChange prop을 받아 검색어 입력 시 상위 컴포넌트로 전달
-export default function Header({ onSearchChange }) {
+export default function Header() {
   const [isDark, setIsDark] = useState(false)
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [searchValue, setSearchValue] = useState('')
+
+  // URL에서 초기 검색어 가져오기
+  useEffect(() => {
+    setSearchValue(searchParams.get('search') || '')
+  }, [searchParams])
 
   useEffect(() => {
     if (localStorage.getItem('theme') === 'dark' || 
@@ -30,11 +37,17 @@ export default function Header({ onSearchChange }) {
     }
   }
 
-  // ✅ [추가] 검색 핸들러
+  // ✅ [변경] URL 쿼리 업데이트
   const handleSearch = (e) => {
     const value = e.target.value
     setSearchValue(value)
-    if(onSearchChange) onSearchChange(value)
+    
+    // URL 업데이트 (페이지 이동 없음, 쿼리만 변경)
+    if (value) {
+      router.push(`?search=${value}`)
+    } else {
+      router.push('?') // 검색어 삭제 시 쿼리 제거 (현재 페이지 유지)
+    }
   }
 
   return (

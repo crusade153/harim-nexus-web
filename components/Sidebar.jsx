@@ -1,18 +1,21 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { LayoutDashboard, KanbanSquare, CheckSquare, Archive, CalendarDays, Users, Menu, X, LogOut, Megaphone } from 'lucide-react'
 
-export default function Sidebar({ currentView, onViewChange }) {
+export default function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const pathname = usePathname() // 현재 경로 확인
 
   const menuItems = [
-    { id: 'dashboard', name: '대시보드', icon: LayoutDashboard },
-    { id: 'kanban', name: '업무 보드', icon: KanbanSquare }, 
-    { id: 'todos', name: '프로젝트 & To-Do', icon: CheckSquare, badge: 'Action' }, 
-    { id: 'board', name: '게시판 & 이슈', icon: Megaphone, badge: 'New' }, // 메뉴 추가됨
-    { id: 'archive', name: '팀 아카이브', icon: Archive }, 
-    { id: 'calendar', name: '캘린더', icon: CalendarDays },
-    { id: 'members', name: '팀원 관리', icon: Users },
+    { id: 'dashboard', name: '대시보드', icon: LayoutDashboard, path: '/dashboard' },
+    { id: 'kanban', name: '업무 보드', icon: KanbanSquare, path: '/kanban' }, 
+    { id: 'todos', name: '프로젝트 & To-Do', icon: CheckSquare, badge: 'Action', path: '/todos' }, 
+    { id: 'board', name: '게시판 & 이슈', icon: Megaphone, badge: 'New', path: '/board' },
+    { id: 'archive', name: '팀 아카이브', icon: Archive, path: '/archive' }, 
+    { id: 'calendar', name: '캘린더', icon: CalendarDays, path: '/calendar' },
+    { id: 'members', name: '팀원 관리', icon: Users, path: '/members' },
   ]
 
   return (
@@ -21,7 +24,6 @@ export default function Sidebar({ currentView, onViewChange }) {
         {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* 다크모드 대응 클래스 추가 */}
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-[240px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col
         transform transition-transform duration-300 ease-in-out
@@ -38,12 +40,13 @@ export default function Sidebar({ currentView, onViewChange }) {
         <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
           <p className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Menu</p>
           {menuItems.map((item) => {
-            const isActive = currentView === item.id
+            const isActive = pathname === item.path
             const Icon = item.icon
             return (
-              <button
+              <Link
                 key={item.id}
-                onClick={() => { onViewChange(item.id); setIsMobileOpen(false); }}
+                href={item.path}
+                onClick={() => setIsMobileOpen(false)}
                 className={`
                   w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all group
                   ${isActive 
@@ -57,7 +60,7 @@ export default function Sidebar({ currentView, onViewChange }) {
                   <span>{item.name}</span>
                 </div>
                 {item.badge && <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] px-1.5 py-0.5 rounded font-bold">{item.badge}</span>}
-              </button>
+              </Link>
             )
           })}
         </nav>
