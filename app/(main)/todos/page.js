@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import TodoListPage from '@/components/TodoListPage'
 import Skeleton from '@/components/Skeleton'
-import { getSampleData } from '@/lib/sheets'
+import { getRealData } from '@/lib/sheets' // ✅ 수정됨: 진짜 데이터 함수 가져오기
 
 function TodosContent() {
   const searchParams = useSearchParams()
@@ -13,8 +13,9 @@ function TodosContent() {
 
   const loadData = async () => {
     setLoading(true)
-    await new Promise(r => setTimeout(r, 500))
-    setData(getSampleData())
+    // ✅ 수정됨: 가짜 데이터(getSampleData) 대신 진짜 DB 데이터(getRealData) 사용
+    const dbData = await getRealData()
+    setData(dbData)
     setLoading(false)
   }
 
@@ -22,6 +23,7 @@ function TodosContent() {
 
   const filteredProjects = useMemo(() => {
     if (!data) return []
+    // data.projects가 이제 DB에서 온 진짜 데이터입니다
     if (!searchTerm.trim()) return data.projects
     return data.projects.filter(p => 
       p.제목.toLowerCase().includes(searchTerm.toLowerCase())

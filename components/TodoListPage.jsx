@@ -1,16 +1,23 @@
 'use client'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, CheckCircle2, Circle, Calendar } from 'lucide-react'
-import { createProject, createTodo, toggleTodo } from '@/lib/sheets' // ✅ DB 함수 가져오기
+import { Plus, CheckCircle2, Circle, Calendar, X, FolderPlus, ListPlus } from 'lucide-react' // 아이콘 추가
+import { createProject, createTodo, toggleTodo } from '@/lib/sheets' 
 
 export default function TodoListPage({ projects = [], onRefresh }) {
   const [activeProjectID, setActiveProjectID] = useState(projects[0]?.ID || null)
   
-  // 현재 선택된 프로젝트 찾기 (없으면 첫 번째)
+  // 모달 상태 관리
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
+  const [isTodoModalOpen, setIsTodoModalOpen] = useState(false)
+
+  // 입력 폼 상태 관리
+  const [newProject, setNewProject] = useState({ 제목: '', 기간: '' })
+  const [newTodo, setNewTodo] = useState({ 항목: '', 담당자: '' })
+
+  // 현재 선택된 프로젝트 찾기
   const activeProject = projects.find(p => p.ID === activeProjectID) || projects[0]
   
-  // 프로젝트 변경 시 ID 업데이트
   if (!activeProjectID && projects.length > 0) {
     setActiveProjectID(projects[0].ID)
   }
@@ -21,7 +28,7 @@ export default function TodoListPage({ projects = [], onRefresh }) {
     return Math.round((completed / todos.length) * 100)
   }
 
-  // ✅ [New] 할 일 완료 토글
+  // ✅ 할 일 완료 토글
   const handleCheck = async (todoId, currentStatus) => {
     try {
       await toggleTodo(todoId, currentStatus)
@@ -31,16 +38,18 @@ export default function TodoListPage({ projects = [], onRefresh }) {
     }
   }
 
-  // ✅ [New] 새 프로젝트 추가 (입력창 사용)
-  const handleAddProject = async () => {
-    const title = window.prompt('새 프로젝트 제목을 입력하세요:')
-    if (!title) return
-    
-    const period = window.prompt('기간을 입력하세요 (예: 2026.01.01 ~ 01.31):', '2026.01.01 ~ ')
+  // ✅ [New] 프로젝트 저장 핸들러
+  const handleSaveProject = async () => {
+    if (!newProject.제목.trim()) { toast.error('프로젝트 제목을 입력하세요.'); return }
     
     try {
-      await createProject({ 제목: title, 기간: period })
-      toast.success('프로젝트가 생성되었습니다!')
+      await createProject({ 
+        제목: newProject.제목, 
+        기간: newProject.기간 || '2026.01.01 ~ 2026.12.31' // 기본값
+      })
+      toast.success('새 프로젝트가 생성되었습니다!')
+      setNewProject({ 제목: '', 기간: '' }) // 초기화
+      setIsProjectModalOpen(false) // 모달 닫기
       if (onRefresh) onRefresh()
     } catch (error) {
       toast.error('프로젝트 생성 실패')
@@ -48,22 +57,20 @@ export default function TodoListPage({ projects = [], onRefresh }) {
     }
   }
 
-  // ✅ [New] 새 할 일 추가 (입력창 사용)
-  const handleAddTodo = async () => {
+  // ✅ [New] 할 일 저장 핸들러
+  const handleSaveTodo = async () => {
     if (!activeProject) return toast.error('프로젝트를 먼저 선택하세요.')
-
-    const content = window.prompt('할 일 내용을 입력하세요:')
-    if (!content) return
-
-    const assignee = window.prompt('담당자 이름을 입력하세요:', '유경덕')
+    if (!newTodo.항목.trim()) { toast.error('할 일을 입력하세요.'); return }
 
     try {
       await createTodo({ 
         projectID: activeProject.ID, 
-        항목: content, 
-        담당자: assignee 
+        항목: newTodo.항목, 
+        담당자: newTodo.담당자 || '유경덕' // 기본값
       })
       toast.success('할 일이 추가되었습니다!')
+      setNewTodo({ 항목: '', 담당자: '' }) // 초기화
+      setIsTodoModalOpen(false) // 모달 닫기
       if (onRefresh) onRefresh()
     } catch (error) {
       toast.error('할 일 추가 실패')
@@ -72,21 +79,21 @@ export default function TodoListPage({ projects = [], onRefresh }) {
   }
 
   return (
-    <div className="h-full flex flex-col md:flex-row gap-6">
+    <div className="h-full flex flex-col md:flex-row gap-6 relative">
       
       {/* 1. 좌측: 프로젝트 목록 */}
       <div className="w-full md:w-80 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">프로젝트</h2>
           <button 
-            onClick={handleAddProject} // ✅ 연결됨
+            onClick={() => setIsProjectModalOpen(true)} // 모달 열기
             className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors"
           >
             <Plus size={20} />
           </button>
         </div>
         
-        <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-200px)]">
+        <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-200px)] custom-scrollbar">
           {projects.map(project => {
             const progress = calculateProgress(project.todos)
             const isActive = activeProject?.ID === project.ID
@@ -101,10 +108,10 @@ export default function TodoListPage({ projects = [], onRefresh }) {
                 }`}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className={`font-bold ${isActive ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                  <h3 className={`font-bold truncate ${isActive ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>
                     {project.제목}
                   </h3>
-                  {isActive && <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5" />}
+                  {isActive && <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0" />}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-3">
                   <Calendar size={12} /> {project.기간}
@@ -120,8 +127,11 @@ export default function TodoListPage({ projects = [], onRefresh }) {
             )
           })}
           {projects.length === 0 && (
-            <div className="text-center py-10 text-slate-400 text-sm">
-              생성된 프로젝트가 없습니다.<br/>+ 버튼을 눌러 추가해보세요.
+            <div className="text-center py-10 text-slate-400 text-sm border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+              생성된 프로젝트가 없습니다.<br/>
+              <button onClick={() => setIsProjectModalOpen(true)} className="text-indigo-500 font-bold mt-2 hover:underline">
+                새 프로젝트 만들기
+              </button>
             </div>
           )}
         </div>
@@ -142,12 +152,12 @@ export default function TodoListPage({ projects = [], onRefresh }) {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-1">
+            <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
               {activeProject.todos?.map(todo => (
                 <div key={todo.ID} className="group flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
                   <div className="flex items-center gap-4 flex-1">
                     <button 
-                      onClick={() => handleCheck(todo.ID, todo.완료)} // ✅ 연결됨
+                      onClick={() => handleCheck(todo.ID, todo.완료)} 
                       className={`transition-colors ${todo.완료 ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-400'}`}
                     >
                       {todo.완료 ? <CheckCircle2 size={24} /> : <Circle size={24} />}
@@ -170,7 +180,7 @@ export default function TodoListPage({ projects = [], onRefresh }) {
               ))}
               
               <button 
-                onClick={handleAddTodo} // ✅ 연결됨
+                onClick={() => setIsTodoModalOpen(true)} // 모달 열기
                 className="w-full py-3 mt-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-indigo-500 hover:border-indigo-300 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all flex items-center justify-center gap-2 font-medium text-sm"
               >
                 <Plus size={18} /> 새 할 일 추가
@@ -178,11 +188,101 @@ export default function TodoListPage({ projects = [], onRefresh }) {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400">
-            👈 왼쪽에서 프로젝트를 추가하거나 선택하세요.
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+            <FolderPlus size={48} className="mb-4 opacity-20" />
+            <p>좌측에서 프로젝트를 선택하거나 추가하세요.</p>
           </div>
         )}
       </div>
+
+      {/* ================================================================================== */}
+      {/* 🟢 [Modal 1] 새 프로젝트 추가 팝업 */}
+      {/* ================================================================================== */}
+      {isProjectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button onClick={() => setIsProjectModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"><X size={20} /></button>
+            
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <FolderPlus size={20} className="text-indigo-500"/> 새 프로젝트 만들기
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">프로젝트 제목 <span className="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  value={newProject.제목} 
+                  onChange={(e) => setNewProject({...newProject, 제목: e.target.value})}
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white transition-all"
+                  placeholder="예: 1월 정기 결산"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">진행 기간</label>
+                <input 
+                  type="text" 
+                  value={newProject.기간} 
+                  onChange={(e) => setNewProject({...newProject, 기간: e.target.value})}
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white transition-all"
+                  placeholder="예: 2026.01.01 ~ 2026.01.10"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button onClick={() => setIsProjectModalOpen(false)} className="flex-1 btn-secondary">취소</button>
+              <button onClick={handleSaveProject} className="flex-1 btn-primary">생성하기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================================== */}
+      {/* 🔵 [Modal 2] 새 할 일 추가 팝업 */}
+      {/* ================================================================================== */}
+      {isTodoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button onClick={() => setIsTodoModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"><X size={20} /></button>
+            
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <ListPlus size={20} className="text-indigo-500"/> 새 할 일 추가
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">할 일 내용 <span className="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  value={newTodo.항목} 
+                  onChange={(e) => setNewTodo({...newTodo, 항목: e.target.value})}
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white transition-all"
+                  placeholder="예: 보고서 초안 작성"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">담당자</label>
+                <input 
+                  type="text" 
+                  value={newTodo.담당자} 
+                  onChange={(e) => setNewTodo({...newTodo, 담당자: e.target.value})}
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white transition-all"
+                  placeholder="이름 입력 (예: 유경덕)"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button onClick={() => setIsTodoModalOpen(false)} className="flex-1 btn-secondary">취소</button>
+              <button onClick={handleSaveTodo} className="flex-1 btn-primary">추가하기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
