@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import CalendarPage from '@/components/CalendarPage'
 import Skeleton from '@/components/Skeleton'
-import { getRealData } from '@/lib/sheets' // ✅ 진짜 데이터 함수 가져오기
+import { getRealData } from '@/lib/sheets' 
 
 export default function CalendarRoutePage() {
   const [data, setData] = useState(null)
@@ -10,7 +10,6 @@ export default function CalendarRoutePage() {
 
   const loadData = async () => {
     setLoading(true)
-    // ✅ DB에서 진짜 데이터를 가져옵니다
     const dbData = await getRealData()
     setData(dbData)
     setLoading(false)
@@ -23,7 +22,9 @@ export default function CalendarRoutePage() {
   return (
     <CalendarPage 
       schedules={data.schedules} 
-      tasks={data.tasks} 
+      tasks={data.tasks}
+      members={data.members}       // ✅ 추가됨: 팀원 목록 전달
+      currentUser={data.currentUser} // ✅ 추가됨: 현재 로그인 유저 전달
       onRefresh={loadData} 
     />
   )
