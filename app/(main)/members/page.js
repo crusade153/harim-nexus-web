@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import MembersPage from '@/components/MembersPage'
 import Skeleton from '@/components/Skeleton'
-import { getSampleData } from '@/lib/sheets'
+import { getRealData } from '@/lib/sheets' // ✅ 진짜 데이터 가져오기
 
 export default function MembersRoutePage() {
   const [data, setData] = useState(null)
@@ -10,8 +10,9 @@ export default function MembersRoutePage() {
 
   const loadData = async () => {
     setLoading(true)
-    await new Promise(r => setTimeout(r, 500))
-    setData(getSampleData())
+    // ✅ 실제 DB 데이터 로드
+    const dbData = await getRealData()
+    setData(dbData)
     setLoading(false)
   }
 

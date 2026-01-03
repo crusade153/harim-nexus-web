@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, MessageSquare, Calendar, User, AlignLeft, Send, CheckCircle2, ChevronDown, ChevronUp, Link as LinkIcon, ExternalLink } from 'lucide-react'
+import { Plus, MessageSquare, Calendar, User, AlignLeft, Send, CheckCircle2, ChevronDown, ChevronUp, Link as LinkIcon, ExternalLink, X, Flag } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -23,15 +23,16 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 import Drawer from '@/components/ui/Drawer'
+import { updateTaskStatus, createTask } from '@/lib/sheets' // ✅ createTask 추가됨
 
-// 1. 충돌 감지 (빈 컬럼 드롭 지원)
+// 1. 충돌 감지
 function customCollisionDetection(args) {
   const pointerCollisions = pointerWithin(args);
   if (pointerCollisions.length > 0) return pointerCollisions;
   return closestCorners(args);
 }
 
-// 2. 드래그 가능한 카드 컴포넌트
+// 2. 드래그 가능한 카드
 function SortableTask({ task, onClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.ID, data: { ...task } })
 
@@ -118,7 +119,10 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
   const [showAllDone, setShowAllDone] = useState(false)
   const [activeMobileColumn, setActiveMobileColumn] = useState('진행중')
   
-  // ✅ [추가] 내 업무만 보기 필터 상태
+  // ✅ [New] 새 업무 추가 모달 상태
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [newTask, setNewTask] = useState({ 제목: '', 우선순위: '보통', 담당자명: '유경덕', 마감일: '', 내용: '' })
+
   const [onlyMyTasks, setOnlyMyTasks] = useState(false)
   const currentUser = '유경덕' 
   const columns = ['대기', '진행중', '완료', '중단']
@@ -127,7 +131,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
     setItems(initialTasks)
   }, [initialTasks])
 
-  // ✅ [추가] 필터링된 아이템 계산 (화면 표시용)
   const filteredItems = useMemo(() => {
     if (onlyMyTasks) {
       return items.filter(t => t.담당자명 === currentUser)
@@ -154,6 +157,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
     const overTask = items.find(i => i.ID === overId)
     if (!activeTask) return
     
+    // 시각적 피드백
     if (overTask && activeTask.상태 !== overTask.상태) {
       setItems((items) => items.map(item => item.ID === activeId ? { ...item, 상태: overTask.상태 } : item))
     } else if (columns.includes(overId) && activeTask.상태 !== overId) {
@@ -161,26 +165,72 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
     }
   }
 
-  const handleDragEnd = (event) => {
+  // ✅ [수정됨] 드래그 종료 시 DB 저장 (ID 처리 강화)
+  const handleDragEnd = async (event) => {
     const { active, over } = event
     setActiveId(null)
     if (!over) return
-    const activeId = active.id; const overId = over.id
+    
+    const activeId = active.id
+    const overId = over.id
     const activeTask = items.find(i => i.ID === activeId)
-    const overTask = items.find(i => i.ID === overId)
-    if (activeTask && overTask && activeTask.상태 === overTask.상태) {
-      const activeIndex = items.findIndex(i => i.ID === activeId)
-      const overIndex = items.findIndex(i => i.ID === overId)
-      if (activeIndex !== overIndex) setItems((items) => arrayMove(items, activeIndex, overIndex))
+
+    // 드롭된 위치의 상태 확인
+    let newStatus = overId
+    if (items.find(i => i.ID === overId)) {
+       newStatus = items.find(i => i.ID === overId).상태
+    }
+
+    if (activeTask && activeTask.상태 !== newStatus) {
+      // 1. 화면 먼저 갱신
+      const updatedItems = items.map(item => item.ID === activeId ? { ...item, 상태: newStatus } : item)
+      setItems(updatedItems) 
+      
+      try {
+        // 2. 실제 DB 저장 (문자열 ID를 그대로 넘김 - lib/sheets.js에서 변환)
+        await updateTaskStatus(activeId, newStatus) 
+        toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
+      } catch (error) {
+        console.error(error)
+        toast.error('상태 변경 실패')
+        if (onRefresh) onRefresh() // 실패 시 되돌리기
+      }
     }
   }
 
-  const handleStatusChange = (newStatus) => {
+  const handleStatusChange = async (newStatus) => {
     if (!selectedTask) return
+    
     const updatedItems = items.map(item => item.ID === selectedTask.ID ? { ...item, 상태: newStatus } : item)
     setItems(updatedItems)
     setSelectedTask({ ...selectedTask, 상태: newStatus })
-    toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
+    
+    try {
+        await updateTaskStatus(selectedTask.ID, newStatus)
+        toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
+    } catch (error) {
+        toast.error('상태 변경 실패')
+        if (onRefresh) onRefresh()
+    }
+  }
+
+  // ✅ [New] 새 업무 저장 핸들러
+  const handleCreateTask = async () => {
+    if (!newTask.제목) {
+      toast.error('업무 제목을 입력해주세요.')
+      return
+    }
+
+    try {
+      await createTask(newTask)
+      toast.success('새 업무가 등록되었습니다!')
+      setIsTaskModalOpen(false)
+      setNewTask({ 제목: '', 우선순위: '보통', 담당자명: '유경덕', 마감일: '', 내용: '' })
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      console.error(error)
+      toast.error('업무 등록 실패')
+    }
   }
 
   const handleAddComment = (e) => {
@@ -212,20 +262,18 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
             <p className="text-slate-500 dark:text-slate-400 text-sm">팀의 업무 흐름을 관리하세요.</p>
           </div>
           <div className="flex gap-2">
-            {/* ✅ [추가] 내 업무만 보기 토글 버튼 */}
             <button 
               onClick={() => setOnlyMyTasks(!onlyMyTasks)}
               className={`btn-secondary text-xs flex items-center gap-2 ${onlyMyTasks ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : ''}`}
             >
               <User size={14} /> {onlyMyTasks ? '전체 보기' : '내 업무만 보기'}
             </button>
-            <button onClick={() => toast('새 업무 추가 기능은 준비 중입니다.', { icon: '🚧' })} className="btn-primary">
+            <button onClick={() => setIsTaskModalOpen(true)} className="btn-primary">
               <Plus size={16} /> 새 업무 추가
             </button>
           </div>
         </div>
 
-        {/* ✅ [추가] 모바일 전용 탭 메뉴 (md:hidden) */}
         <div className="flex md:hidden bg-slate-100 dark:bg-slate-800 p-1 rounded-xl overflow-x-auto scrollbar-hide">
           {columns.map(col => (
             <button
@@ -240,13 +288,11 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
           ))}
         </div>
 
-        {/* 메인 그리드 */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 overflow-hidden min-h-[500px]">
           {columns.map(status => {
             const isHiddenMobile = status !== activeMobileColumn
             const allColumnItems = filteredItems.filter(t => t.상태 === status) 
             
-            // 완료 컬럼 펼침/접힘 로직
             let displayItems = allColumnItems
             if (status === '완료' && !showAllDone && allColumnItems.length > 5) {
               displayItems = allColumnItems.slice(0, 5) 
@@ -270,7 +316,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
           })}
         </div>
 
-        {/* 드래그 오버레이 */}
         <DragOverlay dropAnimation={null}>
           {activeItem ? (
             <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-indigo-500 shadow-xl opacity-90 rotate-2 cursor-grabbing w-[300px] pointer-events-none">
@@ -279,7 +324,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
           ) : null}
         </DragOverlay>
 
-        {/* 상세 보기 Drawer */}
+        {/* 업무 상세 Drawer */}
         <Drawer isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="업무 상세 정보">
           {selectedTask && (
             <div className="space-y-8">
@@ -293,7 +338,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">{selectedTask.제목}</h2>
               </div>
               
-              {/* ✅ [추가] 관련 위키 문서 연결 */}
               <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
                 <h3 className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-3 flex items-center gap-2"><LinkIcon size={16} /> 관련 지식/문서</h3>
                 {selectedTask.관련문서ID ? (
@@ -342,6 +386,55 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
             </div>
           )}
         </Drawer>
+
+        {/* ✅ [New] 새 업무 추가 모달 */}
+        {isTaskModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl relative flex flex-col max-h-[90vh]">
+              <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">새 업무 추가</h2>
+                <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20} /></button>
+              </div>
+              
+              <div className="p-6 space-y-5 overflow-y-auto">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">제목 <span className="text-red-500">*</span></label>
+                  <input type="text" value={newTask.제목} onChange={(e) => setNewTask({...newTask, 제목: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" placeholder="업무 제목을 입력하세요" autoFocus />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">우선순위</label>
+                    <div className="flex gap-2">
+                      {['낮음', '보통', '높음'].map(p => (
+                        <button key={p} onClick={() => setNewTask({...newTask, 우선순위: p})} className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${newTask.우선순위 === p ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 border-transparent' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>{p}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">담당자</label>
+                    <input type="text" value={newTask.담당자명} onChange={(e) => setNewTask({...newTask, 담당자명: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" />
+                  </div>
+                </div>
+
+                <div>
+                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">마감일</label>
+                   <input type="date" value={newTask.마감일} onChange={(e) => setNewTask({...newTask, 마감일: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">상세 내용</label>
+                  <textarea value={newTask.내용} onChange={(e) => setNewTask({...newTask, 내용: e.target.value})} className="w-full h-32 px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none dark:text-white" placeholder="업무 내용을 입력하세요..." />
+                </div>
+              </div>
+
+              <div className="p-6 pt-0 flex gap-3">
+                <button onClick={() => setIsTaskModalOpen(false)} className="flex-1 btn-secondary">취소</button>
+                <button onClick={handleCreateTask} className="flex-1 btn-primary">등록하기</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DndContext>
   )

@@ -2,17 +2,17 @@
 import { useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isSaturday, isSunday } from 'date-fns'
-import { getSampleData } from '@/lib/sheets'
-import { ChevronLeft, ChevronRight, Plus, X, Clock, AlignLeft, CheckSquare, User } from 'lucide-react'
+import { getSampleData, createSchedule } from '@/lib/sheets' // ✅ createSchedule 추가됨
+import { ChevronLeft, ChevronRight, Plus, X,Qm, Clock, AlignLeft, CheckSquare, User } from 'lucide-react'
 
 export default function CalendarPage({ schedules, tasks = [], onRefresh }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   
-  // ✅ [추가] 내 일정만 보기 필터 상태
+  // 내 일정만 보기 필터 상태
   const [onlyMySchedules, setOnlyMySchedules] = useState(false)
-  const currentUser = '유경덕' // 현재 로그인 사용자 (mock)
+  const currentUser = '유경덕' // 현재 로그인 사용자 (임시)
 
   const [newSchedule, setNewSchedule] = useState({
     유형: '회의',
@@ -32,12 +32,12 @@ export default function CalendarPage({ schedules, tasks = [], onRefresh }) {
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate })
 
   const calendarEvents = useMemo(() => {
-    // 1. 기존 일정 변환 (대상자가 없으면 '전체'로 간주)
+    // 1. 기존 일정 변환
     const formattedSchedules = schedules.map(s => ({
       ...s,
       type: 'schedule',
       dateKey: s.날짜,
-      담당자: s.내용.includes('연차') ? s.내용.split(' ')[0] : '전체' // 예시: '전용주 연차' -> '전용주'
+      담당자: s.내용.includes('연차') ? s.내용.split(' ')[0] : '전체' 
     }))
 
     // 2. 업무 변환
@@ -53,7 +53,7 @@ export default function CalendarPage({ schedules, tasks = [], onRefresh }) {
 
     const allEvents = [...formattedSchedules, ...formattedTasks]
 
-    // ✅ [추가] 필터링 로직
+    // 필터링 로직
     if (onlyMySchedules) {
       return allEvents.filter(e => e.담당자 === currentUser || e.담당자 === '전체')
     }
@@ -76,14 +76,35 @@ export default function CalendarPage({ schedules, tasks = [], onRefresh }) {
     setIsModalOpen(true)
   }
 
-  const handleSave = () => {
+  // ✅ [수정됨] DB 저장 로직 적용
+  const handleSave = async () => {
     if (!newSchedule.내용) {
       toast.error('내용을 입력해주세요!')
       return
     }
-    toast.success('일정이 등록되었습니다.')
-    setIsModalOpen(false)
-    onRefresh()
+
+    try {
+      await createSchedule({
+        ...newSchedule,
+        날짜: newSchedule.날짜 || format(selectedDate, 'yyyy-MM-dd')
+      })
+      
+      toast.success('일정이 등록되었습니다.')
+      setIsModalOpen(false)
+      // 초기화
+      setNewSchedule({
+        유형: '회의', 
+        세부유형: '팀회의', 
+        내용: '', 
+        시간: '09:00', 
+        대상자: '전체'
+      })
+      
+      if (onRefresh) onRefresh() // 데이터 새로고침
+    } catch (error) {
+      console.error(error)
+      toast.error('일정 등록 실패')
+    }
   }
 
   return (
@@ -96,7 +117,6 @@ export default function CalendarPage({ schedules, tasks = [], onRefresh }) {
         </div>
         
         <div className="flex items-center gap-3">
-            {/* ✅ [추가] 내 일정만 보기 토글 버튼 */}
             <button 
               onClick={() => setOnlyMySchedules(!onlyMySchedules)}
               className={`btn-secondary text-xs flex items-center gap-2 ${onlyMySchedules ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : ''}`}

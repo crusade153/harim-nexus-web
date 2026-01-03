@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { X, Image as ImageIcon, Search, MessageSquare } from 'lucide-react'
-import { createPost, createComment } from '@/lib/sheets' // ✅ createComment 추가
+import { createPost, createComment } from '@/lib/sheets'
 
 export default function BoardPage({ posts, currentUser, onRefresh }) {
   const [filter, setFilter] = useState('전체')
@@ -15,13 +15,13 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
   const [newPost, setNewPost] = useState({ 제목: '', 태그: '일반', 내용: '', 첨부파일: null })
   const [commentInput, setCommentInput] = useState('')
 
-  // ✅ 데이터 갱신 시 selectedPost도 최신 상태로 업데이트 (댓글 실시간 반영 효과)
+  // 데이터 갱신 시 selectedPost도 최신 상태로 업데이트
   useEffect(() => {
     if (selectedPost) {
       const updatedPost = posts.find(p => p.ID === selectedPost.ID)
       if (updatedPost) setSelectedPost(updatedPost)
     }
-  }, [posts]) // posts가 바뀔 때마다 실행
+  }, [posts])
 
   // 필터링
   const filteredPosts = posts?.filter(post => {
@@ -35,6 +35,14 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
       case '공지': return 'bg-blue-100 text-blue-600 border-blue-200'
       case '이슈': return 'bg-orange-100 text-orange-600 border-orange-200'
       default: return 'bg-gray-100 text-gray-600 border-gray-200'
+    }
+  }
+
+  // ✅ [수정됨] 파일 선택 핸들러 추가 (이게 없어서 에러 났었음)
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setNewPost({ ...newPost, 첨부파일: file.name }) // 실제 업로드는 구현 안 됨, 파일명만 표시
     }
   }
 
@@ -54,7 +62,7 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     }
   }
 
-  // ✅ [New] 댓글 저장 핸들러
+  // 댓글 저장 핸들러
   const handleAddComment = async () => {
     if (!commentInput.trim()) return
 
@@ -66,8 +74,8 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
       })
       
       toast.success('댓글이 등록되었습니다!')
-      setCommentInput('') // 입력창 비우기
-      if (onRefresh) onRefresh() // 데이터 다시 불러오기 (이때 useEffect가 돌면서 화면 갱신됨)
+      setCommentInput('') 
+      if (onRefresh) onRefresh() 
 
     } catch (error) {
       console.error(error)
@@ -126,7 +134,7 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
         </div>
       </div>
 
-      {/* 🔵 [Modal 1] 상세 보기 & 댓글 */}
+      {/* 상세 보기 & 댓글 */}
       {selectedPost && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
@@ -183,7 +191,7 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
         </div>
       )}
 
-      {/* 🟠 [Modal 2] 글쓰기 모달 */}
+      {/* 글쓰기 모달 */}
       {isWriteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 w-full max-w-2xl shadow-2xl relative">

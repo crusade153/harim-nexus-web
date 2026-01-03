@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Dashboard from '@/components/Dashboard'
 import Skeleton from '@/components/Skeleton'
-import { getSampleData } from '@/lib/sheets'
+import { getRealData } from '@/lib/sheets' // ✅ getRealData 사용 (중요!)
 
 function DashboardContent() {
   const searchParams = useSearchParams()
@@ -14,8 +14,9 @@ function DashboardContent() {
 
   const loadData = async () => {
     setLoading(true)
-    await new Promise(r => setTimeout(r, 500))
-    setData(getSampleData())
+    // ✅ 실제 DB 데이터 가져오기
+    const dbData = await getRealData()
+    setData(dbData)
     setLoading(false)
   }
 

@@ -1,12 +1,15 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation' // ✅ useRouter 추가
 import { LayoutDashboard, KanbanSquare, CheckSquare, Archive, CalendarDays, Users, Menu, X, LogOut, Megaphone } from 'lucide-react'
+import { supabase } from '@/lib/supabase' // ✅ supabase 추가
+import toast from 'react-hot-toast' // ✅ toast 추가
 
 export default function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const pathname = usePathname() // 현재 경로 확인
+  const pathname = usePathname()
+  const router = useRouter() // ✅ 라우터 훅
 
   const menuItems = [
     { id: 'dashboard', name: '대시보드', icon: LayoutDashboard, path: '/dashboard' },
@@ -17,6 +20,18 @@ export default function Sidebar() {
     { id: 'calendar', name: '캘린더', icon: CalendarDays, path: '/calendar' },
     { id: 'members', name: '팀원 관리', icon: Users, path: '/members' },
   ]
+
+  // ✅ 로그아웃 핸들러
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      toast.success('로그아웃 되었습니다.')
+      router.push('/login') // 로그인 페이지로 이동
+    } catch (error) {
+      console.error('로그아웃 에러:', error)
+      toast.error('로그아웃 중 문제가 발생했습니다.')
+    }
+  }
 
   return (
     <>
@@ -66,13 +81,17 @@ export default function Sidebar() {
         </nav>
 
         <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
-          <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer">
+          {/* ✅ 로그아웃 버튼 동작 연결 */}
+          <div 
+            onClick={handleLogout} 
+            className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer group"
+          >
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">유</div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">유경덕</p>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">관리자</p>
             </div>
-            <LogOut size={16} className="text-slate-400" />
+            <LogOut size={16} className="text-slate-400 group-hover:text-red-500 transition-colors" />
           </div>
         </div>
       </aside>
