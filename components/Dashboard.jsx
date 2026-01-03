@@ -163,7 +163,13 @@ export default function Dashboard({ data, onRefresh }) {
             </h3>
             <div className="grid grid-cols-2 gap-3">
               {summary.quickLinks.map((link, i) => (
-                <a key={i} href={link.URL} className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors group">
+                <a 
+                  key={i} 
+                  href={link.URL} 
+                  target="_blank"             // ✅ 새 탭에서 열기
+                  rel="noopener noreferrer"   // ✅ 보안 옵션 추가
+                  className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors group"
+                >
                   <span className="text-slate-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 mb-2">
                     <LinkIcon size={20} /> 
                   </span>
