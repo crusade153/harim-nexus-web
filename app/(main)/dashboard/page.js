@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Dashboard from '@/components/Dashboard'
 import Skeleton from '@/components/Skeleton'
 import { getSampleData } from '@/lib/sheets'
 
-export default function DashboardPage() {
+function DashboardContent() {
   const searchParams = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
   
@@ -36,4 +36,12 @@ export default function DashboardPage() {
   if (loading || !filteredData) return <Skeleton />
 
   return <Dashboard data={filteredData} onRefresh={loadData} />
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<Skeleton />}>
+      <DashboardContent />
+    </Suspense>
+  )
 }
