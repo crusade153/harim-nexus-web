@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import BoardPage from '@/components/BoardPage'
 import Skeleton from '@/components/Skeleton'
 import { getSampleData } from '@/lib/sheets'
 
-export default function BoardRoutePage() {
+function BoardContent() {
   const searchParams = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
   const [data, setData] = useState(null)
@@ -37,5 +37,13 @@ export default function BoardRoutePage() {
       currentUser={data.currentUser} 
       onRefresh={loadData} 
     />
+  )
+}
+
+export default function BoardRoutePage() {
+  return (
+    <Suspense fallback={<Skeleton />}>
+      <BoardContent />
+    </Suspense>
   )
 }

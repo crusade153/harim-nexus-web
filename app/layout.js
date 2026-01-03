@@ -10,7 +10,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ko">
       <body>
-        {/* 전체 레이아웃 래퍼 */}
         <div className="min-h-screen text-slate-800">
           {children}
         </div>

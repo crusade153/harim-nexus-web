@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import KanbanBoard from '@/components/KanbanBoard'
 import Skeleton from '@/components/Skeleton'
 import { getSampleData } from '@/lib/sheets'
 
-export default function KanbanPage() {
+function KanbanContent() {
   const searchParams = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
   const [data, setData] = useState(null)
@@ -37,5 +37,13 @@ export default function KanbanPage() {
       archives={data.archives} 
       onRefresh={loadData} 
     />
+  )
+}
+
+export default function KanbanPage() {
+  return (
+    <Suspense fallback={<Skeleton />}>
+      <KanbanContent />
+    </Suspense>
   )
 }

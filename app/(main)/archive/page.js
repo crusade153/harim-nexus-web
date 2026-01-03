@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import ArchivePage from '@/components/ArchivePage'
 import Skeleton from '@/components/Skeleton'
 import { getSampleData } from '@/lib/sheets'
 
-export default function ArchiveRoutePage() {
+function ArchiveContent() {
   const searchParams = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
   const [data, setData] = useState(null)
@@ -31,4 +31,12 @@ export default function ArchiveRoutePage() {
   if (loading || !data) return <Skeleton />
 
   return <ArchivePage archives={filteredArchives} onRefresh={loadData} />
+}
+
+export default function ArchiveRoutePage() {
+  return (
+    <Suspense fallback={<Skeleton />}>
+      <ArchiveContent />
+    </Suspense>
+  )
 }

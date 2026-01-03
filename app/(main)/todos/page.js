@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import TodoListPage from '@/components/TodoListPage'
 import Skeleton from '@/components/Skeleton'
 import { getSampleData } from '@/lib/sheets'
 
-export default function TodosRoutePage() {
+function TodosContent() {
   const searchParams = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
   const [data, setData] = useState(null)
@@ -31,4 +31,12 @@ export default function TodosRoutePage() {
   if (loading || !data) return <Skeleton />
 
   return <TodoListPage projects={filteredProjects} onRefresh={loadData} />
+}
+
+export default function TodosRoutePage() {
+  return (
+    <Suspense fallback={<Skeleton />}>
+      <TodosContent />
+    </Suspense>
+  )
 }
