@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import KanbanBoard from '@/components/KanbanBoard'
 import Skeleton from '@/components/Skeleton'
-import { getSampleData } from '@/lib/sheets'
+import { getRealData } from '@/lib/sheets' // ✅ getRealData를 import 합니다
 
 function KanbanContent() {
   const searchParams = useSearchParams()
@@ -13,8 +13,9 @@ function KanbanContent() {
 
   const loadData = async () => {
     setLoading(true)
-    await new Promise(r => setTimeout(r, 500))
-    setData(getSampleData())
+    // ✅ 여기만 바뀌었습니다! (가짜 데이터 -> 진짜 DB 데이터)
+    const dbData = await getRealData() 
+    setData(dbData)
     setLoading(false)
   }
 
@@ -22,6 +23,7 @@ function KanbanContent() {
 
   const filteredTasks = useMemo(() => {
     if (!data) return []
+    // data.tasks가 DB에서 온 진짜 데이터입니다
     if (!searchTerm.trim()) return data.tasks
     return data.tasks.filter(t => 
       t.제목.toLowerCase().includes(searchTerm.toLowerCase()) || 

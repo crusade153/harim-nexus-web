@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import BoardPage from '@/components/BoardPage'
 import Skeleton from '@/components/Skeleton'
-import { getSampleData } from '@/lib/sheets'
+import { getRealData } from '@/lib/sheets' // ✅ 여기 수정됨! (getSampleData -> getRealData)
 
 function BoardContent() {
   const searchParams = useSearchParams()
@@ -13,8 +13,9 @@ function BoardContent() {
 
   const loadData = async () => {
     setLoading(true)
-    await new Promise(r => setTimeout(r, 500))
-    setData(getSampleData())
+    // ✅ 여기 수정됨! (가짜 데이터 대신 진짜 DB 데이터 가져오기)
+    const dbData = await getRealData() 
+    setData(dbData)
     setLoading(false)
   }
 
@@ -22,6 +23,7 @@ function BoardContent() {
 
   const filteredPosts = useMemo(() => {
     if (!data) return []
+    // data.posts가 이제 DB에서 온 진짜 데이터입니다
     if (!searchTerm.trim()) return data.posts
     return data.posts.filter(p => 
       p.제목.toLowerCase().includes(searchTerm.toLowerCase()) || 

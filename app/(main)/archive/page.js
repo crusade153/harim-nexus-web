@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import ArchivePage from '@/components/ArchivePage'
 import Skeleton from '@/components/Skeleton'
-import { getSampleData } from '@/lib/sheets'
+import { getRealData } from '@/lib/sheets' // ✅ 수정됨
 
 function ArchiveContent() {
   const searchParams = useSearchParams()
@@ -13,8 +13,9 @@ function ArchiveContent() {
 
   const loadData = async () => {
     setLoading(true)
-    await new Promise(r => setTimeout(r, 500))
-    setData(getSampleData())
+    // ✅ 수정됨 (진짜 데이터 가져오기)
+    const dbData = await getRealData()
+    setData(dbData)
     setLoading(false)
   }
 

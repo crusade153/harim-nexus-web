@@ -2,10 +2,18 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Plus, CheckCircle2, Circle, Calendar } from 'lucide-react'
+import { createProject, createTodo, toggleTodo } from '@/lib/sheets' // ✅ DB 함수 가져오기
 
 export default function TodoListPage({ projects = [], onRefresh }) {
   const [activeProjectID, setActiveProjectID] = useState(projects[0]?.ID || null)
-  const activeProject = projects.find(p => p.ID === activeProjectID)
+  
+  // 현재 선택된 프로젝트 찾기 (없으면 첫 번째)
+  const activeProject = projects.find(p => p.ID === activeProjectID) || projects[0]
+  
+  // 프로젝트 변경 시 ID 업데이트
+  if (!activeProjectID && projects.length > 0) {
+    setActiveProjectID(projects[0].ID)
+  }
 
   const calculateProgress = (todos) => {
     if (!todos || todos.length === 0) return 0
@@ -13,9 +21,54 @@ export default function TodoListPage({ projects = [], onRefresh }) {
     return Math.round((completed / todos.length) * 100)
   }
 
-  const handleCheck = (todoId) => {
-    toast.success('상태가 업데이트되었습니다. (DB 연동 필요)')
-    if (onRefresh) onRefresh()
+  // ✅ [New] 할 일 완료 토글
+  const handleCheck = async (todoId, currentStatus) => {
+    try {
+      await toggleTodo(todoId, currentStatus)
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      toast.error('상태 변경 실패')
+    }
+  }
+
+  // ✅ [New] 새 프로젝트 추가 (입력창 사용)
+  const handleAddProject = async () => {
+    const title = window.prompt('새 프로젝트 제목을 입력하세요:')
+    if (!title) return
+    
+    const period = window.prompt('기간을 입력하세요 (예: 2026.01.01 ~ 01.31):', '2026.01.01 ~ ')
+    
+    try {
+      await createProject({ 제목: title, 기간: period })
+      toast.success('프로젝트가 생성되었습니다!')
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      toast.error('프로젝트 생성 실패')
+      console.error(error)
+    }
+  }
+
+  // ✅ [New] 새 할 일 추가 (입력창 사용)
+  const handleAddTodo = async () => {
+    if (!activeProject) return toast.error('프로젝트를 먼저 선택하세요.')
+
+    const content = window.prompt('할 일 내용을 입력하세요:')
+    if (!content) return
+
+    const assignee = window.prompt('담당자 이름을 입력하세요:', '유경덕')
+
+    try {
+      await createTodo({ 
+        projectID: activeProject.ID, 
+        항목: content, 
+        담당자: assignee 
+      })
+      toast.success('할 일이 추가되었습니다!')
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      toast.error('할 일 추가 실패')
+      console.error(error)
+    }
   }
 
   return (
@@ -25,7 +78,10 @@ export default function TodoListPage({ projects = [], onRefresh }) {
       <div className="w-full md:w-80 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">프로젝트</h2>
-          <button onClick={() => toast('새 프로젝트 추가 기능 준비 중', { icon: '🚧' })} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors">
+          <button 
+            onClick={handleAddProject} // ✅ 연결됨
+            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors"
+          >
             <Plus size={20} />
           </button>
         </div>
@@ -33,7 +89,7 @@ export default function TodoListPage({ projects = [], onRefresh }) {
         <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-200px)]">
           {projects.map(project => {
             const progress = calculateProgress(project.todos)
-            const isActive = activeProjectID === project.ID
+            const isActive = activeProject?.ID === project.ID
             return (
               <div 
                 key={project.ID}
@@ -63,6 +119,11 @@ export default function TodoListPage({ projects = [], onRefresh }) {
               </div>
             )
           })}
+          {projects.length === 0 && (
+            <div className="text-center py-10 text-slate-400 text-sm">
+              생성된 프로젝트가 없습니다.<br/>+ 버튼을 눌러 추가해보세요.
+            </div>
+          )}
         </div>
       </div>
 
@@ -86,7 +147,7 @@ export default function TodoListPage({ projects = [], onRefresh }) {
                 <div key={todo.ID} className="group flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
                   <div className="flex items-center gap-4 flex-1">
                     <button 
-                      onClick={() => handleCheck(todo.ID)}
+                      onClick={() => handleCheck(todo.ID, todo.완료)} // ✅ 연결됨
                       className={`transition-colors ${todo.완료 ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-400'}`}
                     >
                       {todo.완료 ? <CheckCircle2 size={24} /> : <Circle size={24} />}
@@ -97,11 +158,6 @@ export default function TodoListPage({ projects = [], onRefresh }) {
                       }`}>
                         {todo.항목}
                       </p>
-                      {todo.완료 && (
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          완료: {todo.완료자} ({todo.완료시간})
-                        </p>
-                      )}
                     </div>
                   </div>
                   
@@ -114,7 +170,7 @@ export default function TodoListPage({ projects = [], onRefresh }) {
               ))}
               
               <button 
-                onClick={() => toast('할 일 추가 기능 준비 중', { icon: '➕' })}
+                onClick={handleAddTodo} // ✅ 연결됨
                 className="w-full py-3 mt-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-indigo-500 hover:border-indigo-300 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all flex items-center justify-center gap-2 font-medium text-sm"
               >
                 <Plus size={18} /> 새 할 일 추가
@@ -122,7 +178,9 @@ export default function TodoListPage({ projects = [], onRefresh }) {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400">프로젝트를 선택하세요</div>
+          <div className="flex-1 flex items-center justify-center text-slate-400">
+            👈 왼쪽에서 프로젝트를 추가하거나 선택하세요.
+          </div>
         )}
       </div>
     </div>
