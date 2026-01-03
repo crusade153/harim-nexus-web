@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Search, Bell, Settings, Moon, Sun } from 'lucide-react'
 
-// ✅ [변경] onSearchChange prop 추가
+// ✅ [변경] onSearchChange prop을 받아 검색어 입력 시 상위 컴포넌트로 전달
 export default function Header({ onSearchChange }) {
   const [isDark, setIsDark] = useState(false)
   const [searchValue, setSearchValue] = useState('')
@@ -30,11 +30,11 @@ export default function Header({ onSearchChange }) {
     }
   }
 
-  // ✅ [추가] 검색어 변경 핸들러
+  // ✅ [추가] 검색 핸들러
   const handleSearch = (e) => {
     const value = e.target.value
     setSearchValue(value)
-    if(onSearchChange) onSearchChange(value) // 상위 컴포넌트로 전달
+    if(onSearchChange) onSearchChange(value)
   }
 
   return (

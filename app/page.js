@@ -19,10 +19,10 @@ import { getSampleData } from '@/lib/sheets'
 
 export default function Home() {
   const [currentView, setCurrentView] = useState('dashboard')
-  const [searchTerm, setSearchTerm] = useState('') // ✅ [추가] 검색어 상태
+  const [searchTerm, setSearchTerm] = useState('') 
   
   const [data, setData] = useState({
-    currentUser: null, // ✅ [추가] 사용자 정보 포함
+    currentUser: null, 
     members: [], tasks: [], projects: [], archives: [],
     schedules: [], holidays: [], quickLinks: [], activities: [],
     posts: []
@@ -48,7 +48,7 @@ export default function Home() {
     }
   }
 
-  // ✅ [추가] 검색 로직 (Client-side Search)
+  // 검색 로직 (Client-side Search)
   const filteredData = useMemo(() => {
     if (!searchTerm.trim()) return data
 
@@ -80,12 +80,12 @@ export default function Home() {
       )
     }
 
-    // ✅ [변경] 필터링된 데이터(filteredData)와 사용자 정보(currentUser) 전달
     switch (currentView) {
       case 'dashboard':
         return <Dashboard data={filteredData} onRefresh={loadData} />
       case 'kanban':
-        return <KanbanBoard tasks={filteredData.tasks} onRefresh={loadData} />
+        // ✅ [변경] archives 전달 (위키 연결용)
+        return <KanbanBoard tasks={filteredData.tasks} archives={filteredData.archives} onRefresh={loadData} />
       case 'todos':
         return <TodoListPage projects={filteredData.projects} onRefresh={loadData} />
       case 'board': 
@@ -93,7 +93,8 @@ export default function Home() {
       case 'archive':
         return <ArchivePage archives={filteredData.archives} onRefresh={loadData} />
       case 'calendar':
-        return <CalendarPage schedules={filteredData.schedules} onRefresh={loadData} />
+        // ✅ [변경] tasks 전달 (캘린더 연동용)
+        return <CalendarPage schedules={filteredData.schedules} tasks={filteredData.tasks} onRefresh={loadData} />
       case 'members':
         return <MembersPage members={data.members} tasks={data.tasks} projects={data.projects} onRefresh={loadData} />
       default:
@@ -106,7 +107,7 @@ export default function Home() {
       <Sidebar currentView={currentView} onViewChange={setCurrentView} />
       
       <main className="flex-1 lg:ml-[240px] flex flex-col min-h-screen">
-        <Header onSearchChange={setSearchTerm} /> {/* ✅ 검색 핸들러 연결 */}
+        <Header onSearchChange={setSearchTerm} /> 
         <div className="flex-1 p-6 lg:p-8 max-w-[1920px] mx-auto w-full">
           {renderView()}
         </div>
