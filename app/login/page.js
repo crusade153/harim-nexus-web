@@ -38,7 +38,8 @@ export default function LoginPage() {
         return
       }
 
-      if (member.status !== 'active' && member.status !== '온라인') {
+      // 1. 승인 대기 상태 확인 ('pending'이면 로그인 차단)
+      if (member.status === 'pending') {
         toast.error('관리자 승인 대기 중입니다.')
         await supabase.auth.signOut()
         setLoading(false)
@@ -46,7 +47,11 @@ export default function LoginPage() {
       }
 
       toast.success(`${member.name}님 환영합니다!`)
+      
+      // ✅ 2. 로그인 시 상태를 무조건 '온라인'으로 초기화
+      // (텍스트 메시지는 건드리지 않으므로 그대로 유지됩니다)
       await supabase.from('members').update({ status: '온라인' }).eq('id', member.id)
+      
       router.push('/dashboard')
 
     } catch (error) {
@@ -68,7 +73,6 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">아이디 (ID)</label>
-            {/* ✅ 예시 수정됨 */}
             <input 
               type="text" 
               value={loginId}
