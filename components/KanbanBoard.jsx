@@ -14,7 +14,7 @@ import {
   Link as LinkIcon, 
   ExternalLink, 
   X, 
-  Flag 
+  Trash2 
 } from 'lucide-react'
 import {
   DndContext,
@@ -37,7 +37,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 import Drawer from '@/components/ui/Drawer'
-import { updateTaskStatus, createTask, createComment } from '@/lib/sheets'
+import { updateTaskStatus, createTask, createComment, deleteTask } from '@/lib/sheets'
 
 // 1. 충돌 감지 알고리즘
 function customCollisionDetection(args) {
@@ -153,6 +153,8 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
 
   const [onlyMyTasks, setOnlyMyTasks] = useState(false)
   const currentUserName = currentUser?.이름 || '게스트'
+  const isAdmin = currentUser?.아이디 === 'crusade153' // 관리자 권한 확인
+  
   const columns = ['대기', '진행중', '완료', '중단']
 
   useEffect(() => {
@@ -215,7 +217,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // ✅ [드래그 저장 로직] 조건 체크 없이 강제 저장 (Optimistic UI 싱크 문제 해결)
   const handleDragEnd = async (event) => {
     const { active, over } = event
     setActiveId(null)
@@ -227,8 +228,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
        newStatus = items.find(i => i.ID === over.id).상태
     }
 
-    // handleDragOver에서 이미 화면(state)은 바뀌었으므로,
-    // 여기서는 묻지도 따지지도 않고 DB에 "이 녀석 상태는 이거야!"라고 확정 지어줍니다.
     try {
       await updateTaskStatus(active.id, newStatus) 
       toast.success(`'${newStatus}' 상태로 이동됨`)
@@ -275,24 +274,35 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // ✅ [댓글 저장 로직] DB 저장 함수(createComment) 호출 추가됨
+  // ✅ [추가됨] 업무 삭제 핸들러
+  const handleDeleteTask = async () => {
+    if(!confirm('정말 이 업무를 삭제하시겠습니까?')) return
+    
+    try {
+      await deleteTask(selectedTask.ID)
+      toast.success('업무가 삭제되었습니다.')
+      setSelectedTask(null) // Drawer 닫기
+      if(onRefresh) onRefresh()
+    } catch(e) {
+      toast.error('삭제 실패')
+    }
+  }
+
   const handleAddComment = async (e) => {
     e.preventDefault()
     const comment = e.target.comment.value
     if (!comment) return
     
-    // 1. 화면에 먼저 보여주기 (낙관적 업데이트)
     const newComment = { 작성자: currentUserName, 내용: comment, 시간: '방금 전' }
-    const updatedTask = { ...selectedTask, 댓글: [...(selectedTask.댓글 || []), newComment] }
     
+    const updatedTask = { ...selectedTask, 댓글: [...(selectedTask.댓글 || []), newComment] }
     setSelectedTask(updatedTask)
     setItems(items.map(item => item.ID === selectedTask.ID ? updatedTask : item))
     e.target.reset()
 
-    // 2. 실제 DB에 저장
     try {
       await createComment({
-        postID: selectedTask.ID, // 업무 ID
+        postID: selectedTask.ID, 
         content: comment,
         authorName: currentUserName
       })
@@ -389,18 +399,26 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
         <Drawer isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="업무 상세 정보">
           {selectedTask && (
             <div className="space-y-8">
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <select 
-                    value={selectedTask.상태} 
-                    onChange={(e) => handleStatusChange(e.target.value)} 
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border appearance-none outline-none cursor-pointer transition-colors bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white`}
-                  >
-                    {columns.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                  <span className="text-xs text-slate-400">ID: #{selectedTask.ID}</span>
+              <div className="flex justify-between items-start">
+                <div className="flex-1 pr-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <select 
+                            value={selectedTask.상태} 
+                            onChange={(e) => handleStatusChange(e.target.value)} 
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border appearance-none outline-none cursor-pointer transition-colors bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white`}
+                        >
+                            {columns.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                        <span className="text-xs text-slate-400">ID: #{selectedTask.ID}</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">{selectedTask.제목}</h2>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">{selectedTask.제목}</h2>
+                {/* ✅ 삭제 버튼 추가됨 */}
+                {(currentUser?.이름 === selectedTask.담당자명 || isAdmin) && (
+                    <button onClick={handleDeleteTask} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="업무 삭제">
+                        <Trash2 size={20} />
+                    </button>
+                )}
               </div>
               
               {/* 위키 연결 섹션 */}

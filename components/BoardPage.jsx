@@ -1,15 +1,22 @@
 'use client'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { X, Image as ImageIcon, Search, MessageSquare } from 'lucide-react'
-import { createPost, createComment } from '@/lib/sheets'
+import { X, Image as ImageIcon, Search, MessageSquare, Trash2, Edit2 } from 'lucide-react'
+import { createPost, createComment, deletePost, updatePost, deleteComment } from '@/lib/sheets' // ✅ 수정/삭제 함수 추가
 
 export default function BoardPage({ posts, currentUser, onRefresh }) {
   const [filter, setFilter] = useState('전체')
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false)
   const [selectedPost, setSelectedPost] = useState(null)
+  
+  // 수정 모드인지 확인
+  const [isEditMode, setIsEditMode] = useState(false) 
+  
   const [newPost, setNewPost] = useState({ 제목: '', 태그: '일반', 내용: '', 첨부파일: null })
   const [commentInput, setCommentInput] = useState('')
+
+  // 관리자 권한 확인 (유경덕 ID 확인)
+  const isAdmin = currentUser?.아이디 === 'crusade153'
 
   useEffect(() => {
     if (selectedPost) {
@@ -34,54 +41,84 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
 
   const handleFileChange = (e) => {
     const file = e.target.files[0]
-    if (file) {
-      setNewPost({ ...newPost, 첨부파일: file.name }) 
-    }
+    if (file) { setNewPost({ ...newPost, 첨부파일: file.name }) }
   }
 
+  // ✅ 글 저장 or 수정 핸들러
   const handleSave = async () => {
     if (!newPost.제목.trim()) { toast.error('제목 입력!'); return }
     if (!newPost.내용.trim()) { toast.error('내용 입력!'); return }
 
     try {
-      await createPost({ ...newPost, 작성자명: currentUser?.이름 || '익명' })
-      toast.success('게시글 등록 완료!')
+      if (isEditMode && selectedPost) {
+        // 수정 모드
+        await updatePost(selectedPost.ID, newPost)
+        toast.success('게시글이 수정되었습니다!')
+      } else {
+        // 새 글 작성
+        await createPost({ ...newPost, 작성자명: currentUser?.이름 || '익명' })
+        toast.success('게시글 등록 완료!')
+      }
+      
       setNewPost({ 제목: '', 태그: '일반', 내용: '', 첨부파일: null })
       setIsWriteModalOpen(false)
+      setIsEditMode(false)
       if (onRefresh) onRefresh()
     } catch (error) {
-      toast.error('등록 실패')
+      toast.error('처리 실패')
     }
+  }
+
+  // ✅ 글 삭제 핸들러
+  const handleDeletePost = async () => {
+    if (!confirm('정말 이 게시글을 삭제하시겠습니까?')) return
+    try {
+      await deletePost(selectedPost.ID)
+      toast.success('게시글이 삭제되었습니다.')
+      setSelectedPost(null)
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      toast.error('삭제 실패')
+    }
+  }
+
+  // ✅ 수정 버튼 클릭 시 모달 열기
+  const openEditModal = () => {
+    setNewPost({
+      제목: selectedPost.제목,
+      태그: selectedPost.태그,
+      내용: selectedPost.내용,
+      첨부파일: null
+    })
+    setIsEditMode(true)
+    setIsWriteModalOpen(true)
   }
 
   const handleAddComment = async () => {
     if (!commentInput.trim()) return
-
-    const newCommentObj = {
-      작성자: currentUser?.이름 || '익명',
-      내용: commentInput,
-      시간: '방금 전'
-    }
-
-    const updatedPost = { 
-      ...selectedPost, 
-      댓글: [...(selectedPost.댓글 || []), newCommentObj],
-      댓글수: (selectedPost.댓글수 || 0) + 1
-    }
-    setSelectedPost(updatedPost)
-    setCommentInput('')
-
     try {
       await createComment({
         postID: selectedPost.ID,
-        content: newCommentObj.내용,
-        authorName: newCommentObj.작성자
+        content: commentInput,
+        authorName: currentUser?.이름 || '익명'
       })
-      toast.success('댓글이 등록되었습니다!')
+      toast.success('댓글 등록 완료')
+      setCommentInput('')
       if (onRefresh) onRefresh() 
     } catch (error) {
-      console.error(error)
       toast.error('댓글 등록 실패')
+    }
+  }
+
+  // ✅ 댓글 삭제 핸들러
+  const handleDeleteComment = async (commentId) => {
+    if(!confirm('댓글을 삭제하시겠습니까?')) return
+    try {
+      await deleteComment(commentId)
+      toast.success('댓글 삭제됨')
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      toast.error('삭제 실패')
     }
   }
 
@@ -92,7 +129,7 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">게시판 & 이슈 💬</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">팀 내 주요 소식과 긴급 이슈를 공유하세요.</p>
         </div>
-        <button onClick={() => setIsWriteModalOpen(true)} className="btn-primary"><span>✏️</span> 글쓰기</button>
+        <button onClick={() => { setIsEditMode(false); setNewPost({ 제목: '', 태그: '일반', 내용: '', 첨부파일: null }); setIsWriteModalOpen(true); }} className="btn-primary"><span>✏️</span> 글쓰기</button>
       </div>
 
       <div className="card-base p-6 min-h-[500px]">
@@ -135,11 +172,20 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-start p-6 border-b border-gray-100 dark:border-slate-800 shrink-0">
-              <div className="pr-8">
+              <div className="flex-1 pr-4">
                 <div className="flex items-center gap-2 mb-2"><span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getTagStyle(selectedPost.태그)}`}>{selectedPost.태그}</span><span className="text-xs text-gray-400">{selectedPost.날짜}</span></div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white leading-snug">{selectedPost.제목}</h2>
               </div>
-              <button onClick={() => setSelectedPost(null)} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400"><X size={20} /></button>
+              <div className="flex items-center gap-2">
+                {/* ✅ 수정/삭제 버튼: 본인이거나 관리자일 때만 표시 */}
+                {(currentUser?.이름 === selectedPost.작성자명 || isAdmin) && (
+                  <>
+                    <button onClick={openEditModal} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 size={18}/></button>
+                    <button onClick={handleDeletePost} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={18}/></button>
+                  </>
+                )}
+                <button onClick={() => setSelectedPost(null)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400"><X size={20} /></button>
+              </div>
             </div>
 
             <div className="p-6 overflow-y-auto custom-scrollbar">
@@ -152,14 +198,20 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
                     selectedPost.댓글.map((cmt, idx) => (
                       <div key={idx} className="flex gap-3 group">
                         <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">{cmt.작성자[0]}</div>
-                        <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl rounded-tl-none">
-                          <div className="flex items-center gap-2 mb-1"><span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cmt.작성자}</span><span className="text-[10px] text-slate-400">{cmt.시간}</span></div>
+                        <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl rounded-tl-none relative group-hover:bg-slate-100 dark:group-hover:bg-slate-800 transition-colors">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cmt.작성자}</span><span className="text-[10px] text-slate-400">{cmt.시간}</span></div>
+                            {/* 댓글 삭제 버튼: 본인 또는 관리자 */}
+                            {(currentUser?.이름 === cmt.작성자 || isAdmin) && (
+                              <button onClick={() => handleDeleteComment(cmt.ID)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><X size={12}/></button>
+                            )}
+                          </div>
                           <p className="text-sm text-slate-600 dark:text-slate-300">{cmt.내용}</p>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <p className="text-xs text-slate-400 text-center py-4">아직 댓글이 없습니다. 첫 댓글을 남겨보세요!</p>
+                    <p className="text-xs text-slate-400 text-center py-4">아직 댓글이 없습니다.</p>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -175,8 +227,8 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
       {isWriteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 w-full max-w-2xl shadow-2xl relative">
-            <button onClick={() => setIsWriteModalOpen(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white"><X size={24} /></button>
-            <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">새 게시글 작성</h2>
+            <button onClick={() => { setIsWriteModalOpen(false); setIsEditMode(false); }} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white"><X size={24} /></button>
+            <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">{isEditMode ? '게시글 수정' : '새 게시글 작성'}</h2>
             <div className="space-y-5">
               <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">제목 <span className="text-red-500">*</span></label><input type="text" value={newPost.제목} onChange={(e) => setNewPost({...newPost, 제목: e.target.value})} className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-transparent focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all dark:text-white" placeholder="제목을 입력하세요" autoFocus /></div>
               <div className="grid grid-cols-2 gap-4">
@@ -186,8 +238,8 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
               <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">내용 <span className="text-red-500">*</span></label><textarea value={newPost.내용} onChange={(e) => setNewPost({...newPost, 내용: e.target.value})} className="w-full h-40 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-transparent focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none transition-all dark:text-white" placeholder="내용을 입력하세요..." /></div>
             </div>
             <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100 dark:border-slate-800">
-              <button onClick={() => setIsWriteModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">취소</button>
-              <button onClick={handleSave} className="px-6 py-3 rounded-xl bg-slate-900 dark:bg-indigo-600 text-white font-bold hover:bg-black dark:hover:bg-indigo-700 shadow-lg shadow-gray-200 dark:shadow-none transition-all">등록하기</button>
+              <button onClick={() => { setIsWriteModalOpen(false); setIsEditMode(false); }} className="px-6 py-3 rounded-xl font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">취소</button>
+              <button onClick={handleSave} className="px-6 py-3 rounded-xl bg-slate-900 dark:bg-indigo-600 text-white font-bold hover:bg-black dark:hover:bg-indigo-700 shadow-lg shadow-gray-200 dark:shadow-none transition-all">{isEditMode ? '수정하기' : '등록하기'}</button>
             </div>
           </div>
         </div>
