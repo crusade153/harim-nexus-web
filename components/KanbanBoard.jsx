@@ -18,27 +18,28 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable,
+  arrayMove, // ✅ 여기서 불러온 arrayMove를 이제 진짜로 사용합니다!
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
 import Drawer from '@/components/ui/Drawer'
 import { updateTaskStatus, createTask } from '@/lib/sheets'
 
-// 1. 충돌 감지
+// 1. 충돌 감지 알고리즘
 function customCollisionDetection(args) {
   const pointerCollisions = pointerWithin(args);
   if (pointerCollisions.length > 0) return pointerCollisions;
   return closestCorners(args);
 }
 
-// 2. 드래그 가능한 카드
+// 2. 드래그 가능한 카드 컴포넌트
 function SortableTask({ task, onClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.ID, data: { ...task } })
 
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : 1,
+    opacity: isDragging ? 0.3 : 1, // 드래그 중일 때 투명도 조절
   }
 
   return (
@@ -70,7 +71,7 @@ function SortableTask({ task, onClick }) {
   )
 }
 
-// 3. 컬럼 컴포넌트
+// 3. 컬럼(기둥) 컴포넌트
 function KanbanColumn({ id, title, count, totalCount, isExpanded, onToggle, children }) {
   const { setNodeRef, isOver } = useDroppable({ id: id })
 
@@ -111,6 +112,7 @@ function KanbanColumn({ id, title, count, totalCount, isExpanded, onToggle, chil
   )
 }
 
+// 4. 메인 칸반 보드 컴포넌트
 export default function KanbanBoard({ tasks: initialTasks, archives = [], currentUser, onRefresh }) {
   const [items, setItems] = useState(initialTasks)
   const [selectedTask, setSelectedTask] = useState(null)
@@ -149,24 +151,53 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
 
   const activeItem = useMemo(() => items.find((i) => i.ID === activeId), [activeId, items])
 
+  // --- 🔥 드래그 앤 드롭 핵심 로직 수정됨 🔥 ---
+
   const handleDragStart = (event) => setActiveId(event.active.id)
   
+  // 드래그 중일 때 (실시간 위치 변경 및 순서 변경)
   const handleDragOver = (event) => {
     const { active, over } = event
     if (!over) return
-    const activeId = active.id; const overId = over.id
-    if (activeId === overId) return
-    const activeTask = items.find(i => i.ID === activeId)
-    const overTask = items.find(i => i.ID === overId)
-    if (!activeTask) return
     
-    if (overTask && activeTask.상태 !== overTask.상태) {
-      setItems((items) => items.map(item => item.ID === activeId ? { ...item, 상태: overTask.상태 } : item))
-    } else if (columns.includes(overId) && activeTask.상태 !== overId) {
-      setItems((items) => items.map(item => item.ID === activeId ? { ...item, 상태: overId } : item))
+    const activeId = active.id
+    const overId = over.id
+    
+    // 1. 같은 아이템 위면 무시
+    if (activeId === overId) return
+
+    // 2. 타겟이 '태스크'인지 '컬럼(빈 공간)'인지 확인
+    const isActiveTask = items.find(i => i.ID === activeId)
+    const isOverTask = items.find(i => i.ID === overId)
+
+    if (!isActiveTask) return
+
+    // Case A: 다른 태스크 위로 드래그 중일 때 (순서 바꾸기)
+    if (isOverTask) {
+      const activeIndex = items.findIndex(i => i.ID === activeId)
+      const overIndex = items.findIndex(i => i.ID === overId)
+
+      if (items[activeIndex].상태 !== items[overIndex].상태) {
+        // 다른 컬럼의 태스크 위로 갔을 때 -> 상태 변경 & 이동
+        setItems((items) => {
+          const newItems = [...items]
+          newItems[activeIndex].상태 = items[overIndex].상태
+          return arrayMove(newItems, activeIndex, overIndex - 1) // 약간 위쪽으로 삽입
+        })
+      } else {
+        // 같은 컬럼 내에서 순서 변경 (Reordering) -> ✅ arrayMove 사용!
+        setItems((items) => arrayMove(items, activeIndex, overIndex))
+      }
+    } 
+    // Case B: 빈 컬럼 위로 드래그 중일 때 (이동)
+    else if (columns.includes(overId)) {
+       if (isActiveTask.상태 !== overId) {
+         setItems((items) => items.map(item => item.ID === activeId ? { ...item, 상태: overId } : item))
+       }
     }
   }
 
+  // 드래그가 끝났을 때 (DB 저장)
   const handleDragEnd = async (event) => {
     const { active, over } = event
     setActiveId(null)
@@ -176,25 +207,29 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     const overId = over.id
     const activeTask = items.find(i => i.ID === activeId)
 
+    // 최종적으로 어디에 떨어졌는지 확인
     let newStatus = overId
     if (items.find(i => i.ID === overId)) {
        newStatus = items.find(i => i.ID === overId).상태
     }
 
+    // 상태가 변했다면 DB 업데이트
     if (activeTask && activeTask.상태 !== newStatus) {
-      const updatedItems = items.map(item => item.ID === activeId ? { ...item, 상태: newStatus } : item)
-      setItems(updatedItems) 
-      
+      // 화면은 handleDragOver에서 이미 변했으므로 DB만 쏴주면 됨
       try {
         await updateTaskStatus(activeId, newStatus) 
-        toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
+        toast.success(`'${newStatus}' 상태로 변경됨`)
       } catch (error) {
         console.error(error)
-        toast.error('상태 변경 실패')
-        if (onRefresh) onRefresh()
+        toast.error('상태 저장 실패')
+        if (onRefresh) onRefresh() // 실패 시 원복
       }
     }
+    // 참고: 같은 컬럼 내 순서 변경은 DB에 'order' 컬럼이 없으므로 저장되지 않음.
+    // (새로고침하면 다시 날짜순 정렬됨. 하지만 UX상으로는 드래그가 먹히므로 "안 된다"는 느낌은 사라짐)
   }
+
+  // --- 기존 핸들러들 ---
 
   const handleStatusChange = async (newStatus) => {
     if (!selectedTask) return
@@ -255,6 +290,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
   return (
     <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="space-y-4 h-full flex flex-col">
+        {/* 상단 헤더 */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">업무 보드</h1>
@@ -273,6 +309,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           </div>
         </div>
 
+        {/* 모바일 탭 */}
         <div className="flex md:hidden bg-slate-100 dark:bg-slate-800 p-1 rounded-xl overflow-x-auto scrollbar-hide">
           {columns.map(col => (
             <button
@@ -287,6 +324,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           ))}
         </div>
 
+        {/* 메인 칸반 그리드 */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 overflow-hidden min-h-[500px]">
           {columns.map(status => {
             const isHiddenMobile = status !== activeMobileColumn
@@ -315,6 +353,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           })}
         </div>
 
+        {/* 드래그 중인 아이템 잔상 (DragOverlay) */}
         <DragOverlay dropAnimation={null}>
           {activeItem ? (
             <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-indigo-500 shadow-xl opacity-90 rotate-2 cursor-grabbing w-[300px] pointer-events-none">
@@ -323,6 +362,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           ) : null}
         </DragOverlay>
 
+        {/* 업무 상세 Drawer */}
         <Drawer isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="업무 상세 정보">
           {selectedTask && (
             <div className="space-y-8">
@@ -336,6 +376,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">{selectedTask.제목}</h2>
               </div>
               
+              {/* 위키 연결 섹션 */}
               <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
                 <h3 className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-3 flex items-center gap-2"><LinkIcon size={16} /> 관련 지식/문서</h3>
                 {selectedTask.관련문서ID ? (
@@ -385,6 +426,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           )}
         </Drawer>
 
+        {/* 새 업무 추가 모달 */}
         {isTaskModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl relative flex flex-col max-h-[90vh]">
