@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { Plus, CheckCircle2, Circle, Calendar, X, FolderPlus, ListPlus } from 'lucide-react'
 import { createProject, createTodo, toggleTodo } from '@/lib/sheets' 
 
+// ✅ props에 currentUser가 잘 들어오는지 확인하세요
 export default function TodoListPage({ projects = [], currentUser, onRefresh }) {
   const [activeProjectID, setActiveProjectID] = useState(null)
   const [localProjects, setLocalProjects] = useState(projects)
@@ -52,6 +53,7 @@ export default function TodoListPage({ projects = [], currentUser, onRefresh }) 
     }
   }
 
+  // ✅ [수정] 프로젝트 생성 시 currentUser.이름 사용
   const handleSaveProject = async () => {
     if (!newProject.제목.trim()) { toast.error('제목을 입력하세요.'); return }
     
@@ -59,7 +61,7 @@ export default function TodoListPage({ projects = [], currentUser, onRefresh }) 
       await createProject({ 
         제목: newProject.제목, 
         기간: newProject.기간 || '2026.01.01 ~ 2026.12.31',
-        작성자: currentUser?.이름 || '익명' 
+        작성자: currentUser?.이름 || '익명' // 🔥 로그인한 이름 적용
       })
       toast.success('새 프로젝트가 생성되었습니다!')
       setNewProject({ 제목: '', 기간: '' }) 
@@ -70,6 +72,7 @@ export default function TodoListPage({ projects = [], currentUser, onRefresh }) 
     }
   }
 
+  // ✅ [수정] 할 일 추가 시에도 담당자 기본값 적용
   const handleSaveTodo = async () => {
     if (!activeProject) return toast.error('프로젝트를 선택하세요.')
     if (!newTodo.항목.trim()) { toast.error('할 일을 입력하세요.'); return }
@@ -78,7 +81,7 @@ export default function TodoListPage({ projects = [], currentUser, onRefresh }) 
       await createTodo({ 
         projectID: activeProject.ID, 
         항목: newTodo.항목, 
-        담당자: newTodo.담당자 || currentUser?.이름 || '담당자'
+        담당자: newTodo.담당자 || currentUser?.이름 || '담당자' // 🔥 이름 없으면 내 이름 자동 입력
       })
       toast.success('할 일이 추가되었습니다!')
       setNewTodo({ 항목: '', 담당자: '' })
