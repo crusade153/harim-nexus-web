@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, MessageSquare, Calendar, User, AlignLeft, Send, CheckCircle2, ChevronDown, ChevronUp, Link as LinkIcon, ExternalLink, X, Flag } from 'lucide-react'
+import { Plus, MessageSquare, Calendar, User, AlignLeft, Send, CheckCircle2, ChevronDown, ChevronUp, Link as LinkIcon, ExternalLink, X } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -14,7 +14,6 @@ import {
   useDroppable,
 } from '@dnd-kit/core'
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -23,7 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 import Drawer from '@/components/ui/Drawer'
-import { updateTaskStatus, createTask } from '@/lib/sheets' // ✅ createTask 추가됨
+import { updateTaskStatus, createTask } from '@/lib/sheets' 
 
 // 1. 충돌 감지
 function customCollisionDetection(args) {
@@ -112,31 +111,40 @@ function KanbanColumn({ id, title, count, totalCount, isExpanded, onToggle, chil
   )
 }
 
-export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefresh }) {
+// ✅ [수정됨] props에 currentUser 추가
+export default function KanbanBoard({ tasks: initialTasks, archives = [], currentUser, onRefresh }) {
   const [items, setItems] = useState(initialTasks)
   const [selectedTask, setSelectedTask] = useState(null)
   const [activeId, setActiveId] = useState(null)
   const [showAllDone, setShowAllDone] = useState(false)
   const [activeMobileColumn, setActiveMobileColumn] = useState('진행중')
   
-  // ✅ [New] 새 업무 추가 모달 상태
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
-  const [newTask, setNewTask] = useState({ 제목: '', 우선순위: '보통', 담당자명: '유경덕', 마감일: '', 내용: '' })
+  const [newTask, setNewTask] = useState({ 제목: '', 우선순위: '보통', 담당자명: currentUser?.이름 || '미정', 마감일: '', 내용: '' })
 
   const [onlyMyTasks, setOnlyMyTasks] = useState(false)
-  const currentUser = '유경덕' 
+  
+  // ✅ [수정됨] 하드코딩 제거 (현재 로그인 유저 사용)
+  const currentUserName = currentUser?.이름 || '게스트'
   const columns = ['대기', '진행중', '완료', '중단']
 
   useEffect(() => {
     setItems(initialTasks)
   }, [initialTasks])
 
+  // 모달 열릴 때 담당자명 기본값 설정
+  useEffect(() => {
+    if(isTaskModalOpen && currentUser) {
+        setNewTask(prev => ({...prev, 담당자명: currentUser.이름}))
+    }
+  }, [isTaskModalOpen, currentUser])
+
   const filteredItems = useMemo(() => {
     if (onlyMyTasks) {
-      return items.filter(t => t.담당자명 === currentUser)
+      return items.filter(t => t.담당자명 === currentUserName)
     }
     return items
-  }, [items, onlyMyTasks])
+  }, [items, onlyMyTasks, currentUserName])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -145,7 +153,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
 
   const activeItem = useMemo(() => items.find((i) => i.ID === activeId), [activeId, items])
 
-  // --- 이벤트 핸들러 ---
   const handleDragStart = (event) => setActiveId(event.active.id)
   
   const handleDragOver = (event) => {
@@ -157,7 +164,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
     const overTask = items.find(i => i.ID === overId)
     if (!activeTask) return
     
-    // 시각적 피드백
     if (overTask && activeTask.상태 !== overTask.상태) {
       setItems((items) => items.map(item => item.ID === activeId ? { ...item, 상태: overTask.상태 } : item))
     } else if (columns.includes(overId) && activeTask.상태 !== overId) {
@@ -165,7 +171,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
     }
   }
 
-  // ✅ [수정됨] 드래그 종료 시 DB 저장 (ID 처리 강화)
   const handleDragEnd = async (event) => {
     const { active, over } = event
     setActiveId(null)
@@ -175,25 +180,22 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
     const overId = over.id
     const activeTask = items.find(i => i.ID === activeId)
 
-    // 드롭된 위치의 상태 확인
     let newStatus = overId
     if (items.find(i => i.ID === overId)) {
        newStatus = items.find(i => i.ID === overId).상태
     }
 
     if (activeTask && activeTask.상태 !== newStatus) {
-      // 1. 화면 먼저 갱신
       const updatedItems = items.map(item => item.ID === activeId ? { ...item, 상태: newStatus } : item)
       setItems(updatedItems) 
       
       try {
-        // 2. 실제 DB 저장 (문자열 ID를 그대로 넘김 - lib/sheets.js에서 변환)
         await updateTaskStatus(activeId, newStatus) 
         toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
       } catch (error) {
         console.error(error)
         toast.error('상태 변경 실패')
-        if (onRefresh) onRefresh() // 실패 시 되돌리기
+        if (onRefresh) onRefresh()
       }
     }
   }
@@ -214,7 +216,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
     }
   }
 
-  // ✅ [New] 새 업무 저장 핸들러
   const handleCreateTask = async () => {
     if (!newTask.제목) {
       toast.error('업무 제목을 입력해주세요.')
@@ -225,7 +226,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
       await createTask(newTask)
       toast.success('새 업무가 등록되었습니다!')
       setIsTaskModalOpen(false)
-      setNewTask({ 제목: '', 우선순위: '보통', 담당자명: '유경덕', 마감일: '', 내용: '' })
+      setNewTask({ 제목: '', 우선순위: '보통', 담당자명: currentUserName, 마감일: '', 내용: '' })
       if (onRefresh) onRefresh()
     } catch (error) {
       console.error(error)
@@ -233,15 +234,20 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
     }
   }
 
+  // ✅ [수정됨] 댓글 작성 시 내 이름으로 등록 (하드코딩 제거)
   const handleAddComment = (e) => {
     e.preventDefault()
     const comment = e.target.comment.value
     if (!comment) return
-    const newComment = { 작성자: currentUser, 내용: comment, 시간: '방금 전' }
+    
+    const newComment = { 작성자: currentUserName, 내용: comment, 시간: '방금 전' }
     const updatedTask = { ...selectedTask, 댓글: [...(selectedTask.댓글 || []), newComment] }
+    
+    // 화면 먼저 갱신
     setSelectedTask(updatedTask)
-    const updatedItems = items.map(item => item.ID === selectedTask.ID ? updatedTask : item)
-    setItems(updatedItems)
+    setItems(items.map(item => item.ID === selectedTask.ID ? updatedTask : item))
+    
+    // TODO: 실제 DB 연결 필요 (현재는 UI만 갱신됨)
     toast.success('댓글이 등록되었습니다.')
     e.target.reset()
   }
@@ -387,7 +393,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], onRefr
           )}
         </Drawer>
 
-        {/* ✅ [New] 새 업무 추가 모달 */}
+        {/* 새 업무 추가 모달 */}
         {isTaskModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl relative flex flex-col max-h-[90vh]">

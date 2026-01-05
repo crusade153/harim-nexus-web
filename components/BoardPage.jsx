@@ -23,7 +23,6 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     }
   }, [posts])
 
-  // 필터링
   const filteredPosts = posts?.filter(post => {
     if (filter === '전체') return true
     return post.태그 === filter
@@ -38,15 +37,13 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     }
   }
 
-  // ✅ [수정됨] 파일 선택 핸들러 추가 (이게 없어서 에러 났었음)
   const handleFileChange = (e) => {
     const file = e.target.files[0]
     if (file) {
-      setNewPost({ ...newPost, 첨부파일: file.name }) // 실제 업로드는 구현 안 됨, 파일명만 표시
+      setNewPost({ ...newPost, 첨부파일: file.name }) 
     }
   }
 
-  // 게시글 저장
   const handleSave = async () => {
     if (!newPost.제목.trim()) { toast.error('제목 입력!'); return }
     if (!newPost.내용.trim()) { toast.error('내용 입력!'); return }
@@ -62,19 +59,35 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     }
   }
 
-  // 댓글 저장 핸들러
+  // ✅ [수정됨] 댓글 즉시 반영 로직 추가
   const handleAddComment = async () => {
     if (!commentInput.trim()) return
 
+    // 1. 즉시 보여주기용 가짜 댓글 객체 생성 (Optimistic UI)
+    const newCommentObj = {
+      작성자: currentUser?.이름 || '익명',
+      내용: commentInput,
+      시간: '방금 전'
+    }
+
+    // 2. 화면 먼저 갱신 (DB 저장 기다리지 않음)
+    const updatedPost = { 
+      ...selectedPost, 
+      댓글: [...(selectedPost.댓글 || []), newCommentObj],
+      댓글수: (selectedPost.댓글수 || 0) + 1
+    }
+    setSelectedPost(updatedPost)
+    setCommentInput('') // 입력창 비우기
+
     try {
+      // 3. 실제 DB 저장
       await createComment({
         postID: selectedPost.ID,
-        content: commentInput,
-        authorName: currentUser?.이름 || '익명'
+        content: newCommentObj.내용,
+        authorName: newCommentObj.작성자
       })
       
       toast.success('댓글이 등록되었습니다!')
-      setCommentInput('') 
       if (onRefresh) onRefresh() 
 
     } catch (error) {
