@@ -6,16 +6,11 @@ import { createPost, createComment } from '@/lib/sheets'
 
 export default function BoardPage({ posts, currentUser, onRefresh }) {
   const [filter, setFilter] = useState('전체')
-  
-  // 모달 상태
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false)
   const [selectedPost, setSelectedPost] = useState(null)
-
-  // 입력 폼 상태
   const [newPost, setNewPost] = useState({ 제목: '', 태그: '일반', 내용: '', 첨부파일: null })
   const [commentInput, setCommentInput] = useState('')
 
-  // 데이터 갱신 시 selectedPost도 최신 상태로 업데이트
   useEffect(() => {
     if (selectedPost) {
       const updatedPost = posts.find(p => p.ID === selectedPost.ID)
@@ -59,37 +54,31 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     }
   }
 
-  // ✅ [수정됨] 댓글 즉시 반영 로직 추가
   const handleAddComment = async () => {
     if (!commentInput.trim()) return
 
-    // 1. 즉시 보여주기용 가짜 댓글 객체 생성 (Optimistic UI)
     const newCommentObj = {
       작성자: currentUser?.이름 || '익명',
       내용: commentInput,
       시간: '방금 전'
     }
 
-    // 2. 화면 먼저 갱신 (DB 저장 기다리지 않음)
     const updatedPost = { 
       ...selectedPost, 
       댓글: [...(selectedPost.댓글 || []), newCommentObj],
       댓글수: (selectedPost.댓글수 || 0) + 1
     }
     setSelectedPost(updatedPost)
-    setCommentInput('') // 입력창 비우기
+    setCommentInput('')
 
     try {
-      // 3. 실제 DB 저장
       await createComment({
         postID: selectedPost.ID,
         content: newCommentObj.내용,
         authorName: newCommentObj.작성자
       })
-      
       toast.success('댓글이 등록되었습니다!')
       if (onRefresh) onRefresh() 
-
     } catch (error) {
       console.error(error)
       toast.error('댓글 등록 실패')
@@ -98,19 +87,14 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 pb-10">
-      
-      {/* 헤더 */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">게시판 & 이슈 💬</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">팀 내 주요 소식과 긴급 이슈를 공유하세요.</p>
         </div>
-        <button onClick={() => setIsWriteModalOpen(true)} className="btn-primary">
-          <span>✏️</span> 글쓰기
-        </button>
+        <button onClick={() => setIsWriteModalOpen(true)} className="btn-primary"><span>✏️</span> 글쓰기</button>
       </div>
 
-      {/* 리스트 */}
       <div className="card-base p-6 min-h-[500px]">
         <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2">
           {['전체', '공지', '이슈', '일반', '자료'].map((tab) => (
@@ -147,7 +131,6 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
         </div>
       </div>
 
-      {/* 상세 보기 & 댓글 */}
       {selectedPost && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
@@ -162,22 +145,15 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
             <div className="p-6 overflow-y-auto custom-scrollbar">
               <div className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-line min-h-[100px] mb-8">{selectedPost.내용}</div>
 
-              {/* 댓글 목록 */}
               <div className="pt-6 border-t border-gray-100 dark:border-slate-800">
-                <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <MessageSquare size={16}/> 댓글 <span className="text-indigo-500">{selectedPost.댓글수}</span>
-                </h3>
-                
+                <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-4 flex items-center gap-2"><MessageSquare size={16}/> 댓글 <span className="text-indigo-500">{selectedPost.댓글수}</span></h3>
                 <div className="space-y-4 mb-6">
                   {selectedPost.댓글 && selectedPost.댓글.length > 0 ? (
                     selectedPost.댓글.map((cmt, idx) => (
                       <div key={idx} className="flex gap-3 group">
                         <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">{cmt.작성자[0]}</div>
                         <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl rounded-tl-none">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cmt.작성자}</span>
-                            <span className="text-[10px] text-slate-400">{cmt.시간}</span>
-                          </div>
+                          <div className="flex items-center gap-2 mb-1"><span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cmt.작성자}</span><span className="text-[10px] text-slate-400">{cmt.시간}</span></div>
                           <p className="text-sm text-slate-600 dark:text-slate-300">{cmt.내용}</p>
                         </div>
                       </div>
@@ -186,16 +162,8 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
                     <p className="text-xs text-slate-400 text-center py-4">아직 댓글이 없습니다. 첫 댓글을 남겨보세요!</p>
                   )}
                 </div>
-
                 <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={commentInput}
-                    onChange={(e) => setCommentInput(e.target.value)}
-                    placeholder="댓글을 입력하세요..." 
-                    className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition-all shadow-sm"
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-                  />
+                  <input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="댓글을 입력하세요..." className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition-all shadow-sm" onKeyDown={(e) => e.key === 'Enter' && handleAddComment()} />
                   <button onClick={handleAddComment} className="btn-primary py-2 px-5 text-xs whitespace-nowrap h-[46px]">등록</button>
                 </div>
               </div>
@@ -204,7 +172,6 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
         </div>
       )}
 
-      {/* 글쓰기 모달 */}
       {isWriteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 w-full max-w-2xl shadow-2xl relative">

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, MessageSquare, Calendar, User, AlignLeft, Send, CheckCircle2, ChevronDown, ChevronUp, Link as LinkIcon, ExternalLink, X } from 'lucide-react'
+import { Plus, MessageSquare, Calendar, User, AlignLeft, Send, CheckCircle2, ChevronDown, ChevronUp, Link as LinkIcon, ExternalLink, X, Flag } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -22,7 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 import Drawer from '@/components/ui/Drawer'
-import { updateTaskStatus, createTask } from '@/lib/sheets' 
+import { updateTaskStatus, createTask } from '@/lib/sheets'
 
 // 1. 충돌 감지
 function customCollisionDetection(args) {
@@ -111,7 +111,6 @@ function KanbanColumn({ id, title, count, totalCount, isExpanded, onToggle, chil
   )
 }
 
-// ✅ [수정됨] props에 currentUser 추가
 export default function KanbanBoard({ tasks: initialTasks, archives = [], currentUser, onRefresh }) {
   const [items, setItems] = useState(initialTasks)
   const [selectedTask, setSelectedTask] = useState(null)
@@ -123,8 +122,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
   const [newTask, setNewTask] = useState({ 제목: '', 우선순위: '보통', 담당자명: currentUser?.이름 || '미정', 마감일: '', 내용: '' })
 
   const [onlyMyTasks, setOnlyMyTasks] = useState(false)
-  
-  // ✅ [수정됨] 하드코딩 제거 (현재 로그인 유저 사용)
   const currentUserName = currentUser?.이름 || '게스트'
   const columns = ['대기', '진행중', '완료', '중단']
 
@@ -132,7 +129,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     setItems(initialTasks)
   }, [initialTasks])
 
-  // 모달 열릴 때 담당자명 기본값 설정
   useEffect(() => {
     if(isTaskModalOpen && currentUser) {
         setNewTask(prev => ({...prev, 담당자명: currentUser.이름}))
@@ -234,7 +230,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // ✅ [수정됨] 댓글 작성 시 내 이름으로 등록 (하드코딩 제거)
   const handleAddComment = (e) => {
     e.preventDefault()
     const comment = e.target.comment.value
@@ -243,11 +238,9 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     const newComment = { 작성자: currentUserName, 내용: comment, 시간: '방금 전' }
     const updatedTask = { ...selectedTask, 댓글: [...(selectedTask.댓글 || []), newComment] }
     
-    // 화면 먼저 갱신
     setSelectedTask(updatedTask)
     setItems(items.map(item => item.ID === selectedTask.ID ? updatedTask : item))
     
-    // TODO: 실제 DB 연결 필요 (현재는 UI만 갱신됨)
     toast.success('댓글이 등록되었습니다.')
     e.target.reset()
   }
@@ -330,7 +323,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           ) : null}
         </DragOverlay>
 
-        {/* 업무 상세 Drawer */}
         <Drawer isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="업무 상세 정보">
           {selectedTask && (
             <div className="space-y-8">
@@ -393,7 +385,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           )}
         </Drawer>
 
-        {/* 새 업무 추가 모달 */}
         {isTaskModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl relative flex flex-col max-h-[90vh]">
