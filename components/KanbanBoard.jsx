@@ -16,8 +16,8 @@ import {
   ExternalLink, 
   X, 
   Trash2,
-  Save,      // ✅ 저장 아이콘 추가
-  Edit2      // ✅ 편집 아이콘 추가
+  Save,      
+  Edit2      
 } from 'lucide-react'
 import {
   DndContext,
@@ -284,7 +284,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     setSelectedTask(prev => ({ ...prev, [field]: value }))
   }
 
-  // ✅ [추가] 변경 사항 저장 핸들러
+  // ✅ [수정] 변경 사항 저장 핸들러 - 실명 로그를 위해 사용자 이름 전달
   const handleSaveChanges = async () => {
     if(!selectedTask) return
     try {
@@ -294,7 +294,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
             담당자명: selectedTask.담당자명,
             마감일: selectedTask.마감일,
             우선순위: selectedTask.우선순위
-        })
+        }, currentUser?.이름 || '알 수 없음') // ✅ 사용자 이름 전달
         
         // 목록 상태 업데이트
         setItems(items.map(i => i.ID === selectedTask.ID ? selectedTask : i))
@@ -327,18 +327,18 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // ✅ [수정] 위키 연결 핸들러 (DB에 즉시 저장)
+  // ✅ [수정] 위키 연결 핸들러 - 사용자 이름 전달 (필요 시)
   const handleLinkWiki = async (wikiId) => {
     const updated = { ...selectedTask, 관련문서ID: wikiId }
     setSelectedTask(updated)
     setItems(items.map(i => i.ID === selectedTask.ID ? updated : i))
     
     try {
-        await updateTask(selectedTask.ID, { 관련문서ID: wikiId })
+        await updateTask(selectedTask.ID, { 관련문서ID: wikiId }, currentUser?.이름 || '알 수 없음')
         toast.success('관련 문서가 연결되었습니다.')
     } catch(e) {
         console.error(e)
-        toast.error('문서 연결 저장 실패 (DB 컬럼 확인 필요)')
+        toast.error('문서 연결 저장 실패')
     }
   }
 
