@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
+import Link from 'next/link' 
 import { 
   Plus, 
   MessageSquare, 
@@ -14,7 +15,9 @@ import {
   Link as LinkIcon, 
   ExternalLink, 
   X, 
-  Trash2 
+  Trash2,
+  Save,      // ✅ 저장 아이콘 추가
+  Edit2      // ✅ 편집 아이콘 추가
 } from 'lucide-react'
 import {
   DndContext,
@@ -37,7 +40,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 import Drawer from '@/components/ui/Drawer'
-import { updateTaskStatus, createTask, createComment, deleteTask } from '@/lib/sheets'
+import { updateTaskStatus, createTask, createComment, deleteTask, updateTask } from '@/lib/sheets'
 
 // 1. 충돌 감지 알고리즘
 function customCollisionDetection(args) {
@@ -153,7 +156,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
 
   const [onlyMyTasks, setOnlyMyTasks] = useState(false)
   const currentUserName = currentUser?.이름 || '게스트'
-  const isAdmin = currentUser?.아이디 === 'crusade153' // 관리자 권한 확인
+  const isAdmin = currentUser?.아이디 === 'crusade153'
   
   const columns = ['대기', '진행중', '완료', '중단']
 
@@ -161,6 +164,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     setItems(initialTasks)
   }, [initialTasks])
 
+  // 현재 로그인한 유저를 담당자 기본값으로
   useEffect(() => {
     if(isTaskModalOpen && currentUser) {
         setNewTask(prev => ({...prev, 담당자명: currentUser.이름}))
@@ -182,17 +186,13 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
   const activeItem = useMemo(() => items.find((i) => i.ID === activeId), [activeId, items])
 
   // --- 드래그 핸들러 ---
-
   const handleDragStart = (event) => setActiveId(event.active.id)
   
   const handleDragOver = (event) => {
     const { active, over } = event
     if (!over) return
-    
-    const activeId = active.id
-    const overId = over.id
+    const activeId = active.id; const overId = over.id
     if (activeId === overId) return
-
     const activeTask = items.find(i => i.ID === activeId)
     const overTask = items.find(i => i.ID === overId)
     if (!activeTask) return
@@ -200,7 +200,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     if (overTask) {
       const activeIndex = items.findIndex(i => i.ID === activeId)
       const overIndex = items.findIndex(i => i.ID === overId)
-
       if (items[activeIndex].상태 !== items[overIndex].상태) {
         setItems((items) => {
           const newItems = [...items]
@@ -221,13 +220,10 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     const { active, over } = event
     setActiveId(null)
     if (!over) return
-    
-    // 어디에 떨어졌는지 확인
     let newStatus = over.id
     if (items.find(i => i.ID === over.id)) {
        newStatus = items.find(i => i.ID === over.id).상태
     }
-
     try {
       await updateTaskStatus(active.id, newStatus) 
       toast.success(`'${newStatus}' 상태로 이동됨`)
@@ -240,13 +236,12 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
 
   // --- 기타 핸들러 ---
 
+  // 상태 변경
   const handleStatusChange = async (newStatus) => {
     if (!selectedTask) return
-    
     const updatedItems = items.map(item => item.ID === selectedTask.ID ? { ...item, 상태: newStatus } : item)
     setItems(updatedItems)
     setSelectedTask({ ...selectedTask, 상태: newStatus })
-    
     try {
         await updateTaskStatus(selectedTask.ID, newStatus)
         toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
@@ -256,12 +251,9 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
+  // 새 업무 생성
   const handleCreateTask = async () => {
-    if (!newTask.제목) {
-      toast.error('업무 제목을 입력해주세요.')
-      return
-    }
-
+    if (!newTask.제목) { toast.error('업무 제목을 입력해주세요.'); return }
     try {
       await createTask(newTask)
       toast.success('새 업무가 등록되었습니다!')
@@ -274,32 +266,55 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // ✅ [추가됨] 업무 삭제 핸들러
+  // 업무 삭제
   const handleDeleteTask = async () => {
     if(!confirm('정말 이 업무를 삭제하시겠습니까?')) return
-    
     try {
       await deleteTask(selectedTask.ID)
       toast.success('업무가 삭제되었습니다.')
-      setSelectedTask(null) // Drawer 닫기
+      setSelectedTask(null)
       if(onRefresh) onRefresh()
     } catch(e) {
       toast.error('삭제 실패')
     }
   }
 
+  // ✅ [수정] 업무 내용 변경 (상세보기에서 수정)
+  const handleTaskUpdate = (field, value) => {
+    setSelectedTask(prev => ({ ...prev, [field]: value }))
+  }
+
+  // ✅ [추가] 변경 사항 저장 핸들러
+  const handleSaveChanges = async () => {
+    if(!selectedTask) return
+    try {
+        await updateTask(selectedTask.ID, {
+            제목: selectedTask.제목,
+            내용: selectedTask.내용,
+            담당자명: selectedTask.담당자명,
+            마감일: selectedTask.마감일,
+            우선순위: selectedTask.우선순위
+        })
+        
+        // 목록 상태 업데이트
+        setItems(items.map(i => i.ID === selectedTask.ID ? selectedTask : i))
+        toast.success('업무 정보가 수정되었습니다.')
+    } catch (error) {
+        console.error(error)
+        toast.error('수정 실패')
+    }
+  }
+
+  // 댓글 추가
   const handleAddComment = async (e) => {
     e.preventDefault()
     const comment = e.target.comment.value
     if (!comment) return
-    
     const newComment = { 작성자: currentUserName, 내용: comment, 시간: '방금 전' }
-    
     const updatedTask = { ...selectedTask, 댓글: [...(selectedTask.댓글 || []), newComment] }
     setSelectedTask(updatedTask)
     setItems(items.map(item => item.ID === selectedTask.ID ? updatedTask : item))
     e.target.reset()
-
     try {
       await createComment({
         postID: selectedTask.ID, 
@@ -308,17 +323,26 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
       })
       toast.success('댓글이 저장되었습니다.')
     } catch (error) {
-      console.error(error)
       toast.error('댓글 저장 실패')
     }
   }
 
-  const handleLinkWiki = (wikiId) => {
+  // ✅ [수정] 위키 연결 핸들러 (DB에 즉시 저장)
+  const handleLinkWiki = async (wikiId) => {
     const updated = { ...selectedTask, 관련문서ID: wikiId }
     setSelectedTask(updated)
     setItems(items.map(i => i.ID === selectedTask.ID ? updated : i))
-    toast.success('관련 문서가 연결되었습니다.')
+    
+    try {
+        await updateTask(selectedTask.ID, { 관련문서ID: wikiId })
+        toast.success('관련 문서가 연결되었습니다.')
+    } catch(e) {
+        console.error(e)
+        toast.error('문서 연결 저장 실패 (DB 컬럼 확인 필요)')
+    }
   }
+
+  const linkedWikiDoc = selectedTask ? archives.find(a => String(a.ID) === String(selectedTask.관련문서ID)) : null
 
   return (
     <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
@@ -330,10 +354,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
             <p className="text-slate-500 dark:text-slate-400 text-sm">팀의 업무 흐름을 관리하세요.</p>
           </div>
           <div className="flex gap-2">
-            <button 
-              onClick={() => setOnlyMyTasks(!onlyMyTasks)}
-              className={`btn-secondary text-xs flex items-center gap-2 ${onlyMyTasks ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : ''}`}
-            >
+            <button onClick={() => setOnlyMyTasks(!onlyMyTasks)} className={`btn-secondary text-xs flex items-center gap-2 ${onlyMyTasks ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : ''}`}>
               <User size={14} /> {onlyMyTasks ? '전체 보기' : '내 업무만 보기'}
             </button>
             <button onClick={() => setIsTaskModalOpen(true)} className="btn-primary">
@@ -345,13 +366,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
         {/* 모바일 탭 */}
         <div className="flex md:hidden bg-slate-100 dark:bg-slate-800 p-1 rounded-xl overflow-x-auto scrollbar-hide">
           {columns.map(col => (
-            <button
-              key={col}
-              onClick={() => setActiveMobileColumn(col)}
-              className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
-                activeMobileColumn === col ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
+            <button key={col} onClick={() => setActiveMobileColumn(col)} className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${activeMobileColumn === col ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
               {col} ({filteredItems.filter(i => i.상태 === col).length})
             </button>
           ))}
@@ -362,23 +377,15 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           {columns.map(status => {
             const isHiddenMobile = status !== activeMobileColumn
             const allColumnItems = filteredItems.filter(t => t.상태 === status) 
-            
             let displayItems = allColumnItems
             if (status === '완료' && !showAllDone && allColumnItems.length > 5) {
               displayItems = allColumnItems.slice(0, 5) 
             }
-            
             return (
               <div key={status} className={`${isHiddenMobile ? 'hidden md:flex' : 'flex'} h-full flex-col`}>
-                <KanbanColumn 
-                  id={status} title={status} 
-                  count={displayItems.length} totalCount={allColumnItems.length} 
-                  isExpanded={showAllDone} onToggle={() => setShowAllDone(!showAllDone)}
-                >
+                <KanbanColumn id={status} title={status} count={displayItems.length} totalCount={allColumnItems.length} isExpanded={showAllDone} onToggle={() => setShowAllDone(!showAllDone)}>
                   <SortableContext id={status} items={displayItems.map(i => i.ID)} strategy={verticalListSortingStrategy}>
-                    {displayItems.map(task => (
-                      <SortableTask key={task.ID} task={task} onClick={() => setSelectedTask(task)} />
-                    ))}
+                    {displayItems.map(task => (<SortableTask key={task.ID} task={task} onClick={() => setSelectedTask(task)} />))}
                   </SortableContext>
                 </KanbanColumn>
               </div>
@@ -386,7 +393,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           })}
         </div>
 
-        {/* 드래그 중인 아이템 잔상 (DragOverlay) */}
+        {/* 드래그 오버레이 */}
         <DragOverlay dropAnimation={null}>
           {activeItem ? (
             <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-indigo-500 shadow-xl opacity-90 rotate-2 cursor-grabbing w-[300px] pointer-events-none">
@@ -395,30 +402,44 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           ) : null}
         </DragOverlay>
 
-        {/* 업무 상세 Drawer */}
-        <Drawer isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="업무 상세 정보">
+        {/* ✏️ 업무 상세 및 수정 Drawer */}
+        <Drawer isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="업무 상세 및 수정">
           {selectedTask && (
-            <div className="space-y-8">
+            <div className="space-y-8 pb-10">
               <div className="flex justify-between items-start">
-                <div className="flex-1 pr-4">
-                    <div className="flex items-center gap-2 mb-3">
+                <div className="flex-1 pr-4 space-y-3">
+                    {/* 상태 및 ID */}
+                    <div className="flex items-center gap-2">
                         <select 
                             value={selectedTask.상태} 
                             onChange={(e) => handleStatusChange(e.target.value)} 
-                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border appearance-none outline-none cursor-pointer transition-colors bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white`}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border outline-none cursor-pointer bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white`}
                         >
                             {columns.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                         <span className="text-xs text-slate-400">ID: #{selectedTask.ID}</span>
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">{selectedTask.제목}</h2>
+                    {/* ✏️ 제목 수정 인풋 */}
+                    <input 
+                      type="text" 
+                      value={selectedTask.제목} 
+                      onChange={(e) => handleTaskUpdate('제목', e.target.value)}
+                      className="text-2xl font-bold text-slate-900 dark:text-white leading-tight w-full bg-transparent border-b border-transparent focus:border-indigo-500 outline-none transition-colors"
+                    />
                 </div>
-                {/* ✅ 삭제 버튼 추가됨 */}
-                {(currentUser?.이름 === selectedTask.담당자명 || isAdmin) && (
-                    <button onClick={handleDeleteTask} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="업무 삭제">
-                        <Trash2 size={20} />
+                
+                <div className="flex gap-2">
+                    {/* ✅ 저장 버튼 */}
+                    <button onClick={handleSaveChanges} className="p-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm transition-colors" title="변경사항 저장">
+                        <Save size={20} />
                     </button>
-                )}
+                    {/* 삭제 버튼 */}
+                    {(currentUser?.이름 === selectedTask.담당자명 || isAdmin) && (
+                        <button onClick={handleDeleteTask} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="업무 삭제">
+                            <Trash2 size={20} />
+                        </button>
+                    )}
+                </div>
               </div>
               
               {/* 위키 연결 섹션 */}
@@ -435,13 +456,17 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Linked Wiki</p>
                         <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate max-w-[180px]">
-                            {archives.find(a => a.ID === selectedTask.관련문서ID)?.제목 || '삭제된 문서'}
+                            {archives.find(a => String(a.ID) === String(selectedTask.관련문서ID))?.제목 || '삭제된 문서'}
                         </p>
                       </div>
                     </div>
-                    <a href="#" onClick={(e) => { e.preventDefault(); toast('해당 문서로 이동합니다'); }} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 p-2 hover:bg-indigo-50 dark:hover:bg-slate-700 rounded">
+                    {/* ✅ Link 컴포넌트로 이동 */}
+                    <Link 
+                      href={`/archive?search=${encodeURIComponent(linkedWikiDoc?.제목 || '')}`} 
+                      className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 p-2 hover:bg-indigo-50 dark:hover:bg-slate-700 rounded"
+                    >
                       <ExternalLink size={18} />
-                    </a>
+                    </Link>
                   </div>
                 ) : (
                   <select 
@@ -455,28 +480,43 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                 )}
               </div>
 
+              {/* 담당자 및 마감일 수정 */}
               <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
                 <div className="space-y-1">
                   <p className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1">
                     <User size={12}/> 담당자
                   </p>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{selectedTask.담당자명}</p>
+                  <input 
+                    type="text" 
+                    value={selectedTask.담당자명} 
+                    onChange={(e) => handleTaskUpdate('담당자명', e.target.value)}
+                    className="text-sm font-medium text-slate-700 dark:text-slate-200 bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 outline-none w-full"
+                  />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1">
                     <Calendar size={12}/> 마감일
                   </p>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200 pt-1">{selectedTask.마감일 || '미정'}</p>
+                  <input 
+                    type="date" 
+                    value={selectedTask.마감일 || ''} 
+                    onChange={(e) => handleTaskUpdate('마감일', e.target.value)}
+                    className="text-sm font-medium text-slate-700 dark:text-slate-200 bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 outline-none w-full"
+                  />
                 </div>
               </div>
 
+              {/* 내용 수정 */}
               <div>
                 <p className="text-xs text-slate-400 font-bold uppercase mb-2 flex items-center gap-2">
                   <AlignLeft size={14}/> 상세 내용
                 </p>
-                <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed min-h-[100px]">
-                  {selectedTask.내용 || '내용이 없습니다.'}
-                </div>
+                <textarea 
+                  value={selectedTask.내용 || ''} 
+                  onChange={(e) => handleTaskUpdate('내용', e.target.value)}
+                  className="w-full min-h-[150px] text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none resize-none leading-relaxed"
+                  placeholder="내용을 입력하세요..."
+                />
               </div>
               
               <div className="border-t border-slate-100 dark:border-slate-700 pt-6">
@@ -550,49 +590,24 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">우선순위</label>
                     <div className="flex gap-2">
                       {['낮음', '보통', '높음'].map(p => (
-                        <button 
-                          key={p} 
-                          onClick={() => setNewTask({...newTask, 우선순위: p})} 
-                          className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
-                            newTask.우선순위 === p 
-                              ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 border-transparent' 
-                              : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          {p}
-                        </button>
+                        <button key={p} onClick={() => setNewTask({...newTask, 우선순위: p})} className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${newTask.우선순위 === p ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 border-transparent' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>{p}</button>
                       ))}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">담당자</label>
-                    <input 
-                      type="text" 
-                      value={newTask.담당자명} 
-                      onChange={(e) => setNewTask({...newTask, 담당자명: e.target.value})} 
-                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" 
-                    />
+                    <input type="text" value={newTask.담당자명} onChange={(e) => setNewTask({...newTask, 담당자명: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" />
                   </div>
                 </div>
 
                 <div>
                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">마감일</label>
-                   <input 
-                     type="date" 
-                     value={newTask.마감일} 
-                     onChange={(e) => setNewTask({...newTask, 마감일: e.target.value})} 
-                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" 
-                   />
+                   <input type="date" value={newTask.마감일} onChange={(e) => setNewTask({...newTask, 마감일: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">상세 내용</label>
-                  <textarea 
-                    value={newTask.내용} 
-                    onChange={(e) => setNewTask({...newTask, 내용: e.target.value})} 
-                    className="w-full h-32 px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none dark:text-white" 
-                    placeholder="업무 내용을 입력하세요..." 
-                  />
+                  <textarea value={newTask.내용} onChange={(e) => setNewTask({...newTask, 내용: e.target.value})} className="w-full h-32 px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none dark:text-white" placeholder="업무 내용을 입력하세요..." />
                 </div>
               </div>
 

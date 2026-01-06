@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react' // ✅ useEffect 추가됨
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, KanbanSquare, CheckSquare, Archive, CalendarDays, Users, Menu, X, LogOut, Megaphone } from 'lucide-react'
@@ -11,8 +11,7 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
 
-  // ✅ [수정됨] 내 정보 상태 관리 (이름, 직위, 이니셜)
-  const [myProfile, setMyProfile] = useState({ name: '', position: '', initial: '' })
+  const [myProfile, setMyProfile] = useState({ name: '', position: '', initial: '', loginId: '' })
 
   const menuItems = [
     { id: 'dashboard', name: '대시보드', icon: LayoutDashboard, path: '/dashboard' },
@@ -24,17 +23,18 @@ export default function Sidebar() {
     { id: 'members', name: '팀원 관리', icon: Users, path: '/members' },
   ]
 
-  // ✅ [수정됨] 컴포넌트 로드 시 내 정보 가져오기
+  // ✅ [수정] 접속 시 내 정보 로드 + Presence(접속신호) 추적 시작
   useEffect(() => {
-    const loadMyProfile = async () => {
-      // 1. 현재 로그인한 유저 찾기
+    let channel = null;
+
+    const initSidebar = async () => {
+      // 1. 내 정보 가져오기
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user) {
-        // 2. members 테이블에서 상세 정보 조회
         const { data: member } = await supabase
           .from('members')
-          .select('name, position')
+          .select('name, position, login_id')
           .eq('auth_id', user.id)
           .single()
         
@@ -42,15 +42,43 @@ export default function Sidebar() {
           setMyProfile({
             name: member.name,
             position: member.position,
-            initial: member.name ? member.name[0] : '?'
+            initial: member.name ? member.name[0] : '?',
+            loginId: member.login_id
+          })
+
+          // 2. ✅ 실시간 접속 신호 보내기 (Presence Tracking)
+          // 'room_presence'라는 채널에 접속하여 내 login_id를 방송합니다.
+          channel = supabase.channel('room_presence', {
+            config: {
+              presence: {
+                key: member.login_id, // 고유 식별자로 로그인 ID 사용
+              },
+            },
+          })
+
+          channel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+              // 채널 연결 성공 시 상태 전송
+              await channel.track({
+                user_id: member.login_id,
+                online_at: new Date().toISOString(),
+              })
+            }
           })
         }
       }
     }
-    loadMyProfile()
+
+    initSidebar()
+
+    // 3. 컴포넌트 언마운트(종료) 시 채널 나가기
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+    }
   }, [])
 
-  // 로그아웃 핸들러
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut()
@@ -109,7 +137,6 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* ✅ [수정됨] 하단 프로필 섹션 */}
         <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
           <div 
             onClick={handleLogout} 

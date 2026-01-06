@@ -1,38 +1,78 @@
 'use client'
-import { useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   CheckCircle2, Clock, AlertCircle, Calendar, ArrowUpRight, 
   Zap, Link as LinkIcon, Activity 
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 export default function Dashboard({ data, onRefresh }) {
+  const [onlineUserIds, setOnlineUserIds] = useState(new Set())
+  
+  // ✅ 내 아이디 확인 (데이터에서 가져옴)
+  const myLoginId = data?.currentUser?.아이디
+
+  useEffect(() => {
+    // 채널명은 Sidebar와 동일해야 함
+    const channel = supabase.channel('room_presence')
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const newState = channel.presenceState()
+        console.log('📡 [Dashboard] 접속자 명단 수신:', newState) // 디버깅용 로그
+        
+        const userIds = new Set()
+        for (const id in newState) {
+          userIds.add(id)
+        }
+        setOnlineUserIds(userIds)
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ [Dashboard] 실시간 채널 연결됨')
+        }
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
   const summary = useMemo(() => {
-    const tasks = data.tasks || []
-    const members = data.members || []
+    const rawTasks = data?.tasks || []
+    const rawMembers = data?.members || []
     
-    // ✅ [수정됨] 진행률 자동 계산
-    const totalTasks = tasks.length
-    const completedTasks = tasks.filter(t => t.상태 === '완료').length
+    const members = rawMembers.map(m => {
+      // ✅ [핵심 수정] 내 아이디거나, 리스트에 있으면 '온라인' 처리
+      const isMe = m.아이디 === myLoginId
+      const isOnline = onlineUserIds.has(m.아이디)
+      
+      return {
+        ...m,
+        상태: (isMe || isOnline) ? '온라인' : '오프라인'
+      }
+    })
+
+    const totalTasks = rawTasks.length
+    const completedTasks = rawTasks.filter(t => t.상태 === '완료').length
     const progressRate = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100)
 
-    // ✅ [수정됨] 온라인 멤버 수 자동 계산
     const onlineMembers = members.filter(m => m.상태 === '온라인').length
 
     return {
-      progressRate, // 계산된 진행률
-      onlineMembers, // 계산된 온라인 수
+      progressRate, 
+      onlineMembers, 
       totalMembers: members.length,
-      urgentTasks: tasks.filter(t => t.우선순위 === '높음' && t.상태 !== '완료'),
-      ongoingTasks: tasks.filter(t => t.상태 === '진행중'),
-      recentActivities: data.activities || [],
-      quickLinks: data.quickLinks || [],
-      members: members
+      urgentTasks: rawTasks.filter(t => t.우선순위 === '높음' && t.상태 !== '완료'),
+      ongoingTasks: rawTasks.filter(t => t.상태 === '진행중'),
+      recentActivities: data?.activities || [],
+      quickLinks: data?.quickLinks || [],
+      members: members 
     }
-  }, [data])
+  }, [data, onlineUserIds, myLoginId])
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 pb-10">
-      {/* 헤더 */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">안녕하세요, 원가팀! 👋</h1>
@@ -43,9 +83,7 @@ export default function Dashboard({ data, onRefresh }) {
         </button>
       </div>
 
-      {/* 2. 핵심 지표 (Stats Grid) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* 진행률 카드 */}
         <div className="card-base p-5 flex flex-col justify-between h-32">
           <div className="flex justify-between items-start">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600 dark:text-indigo-400"><CheckCircle2 size={20} /></div>
@@ -53,12 +91,10 @@ export default function Dashboard({ data, onRefresh }) {
           </div>
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">전체 업무 진행률</p>
-            {/* ✅ 계산된 진행률 표시 */}
             <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{summary.progressRate}%</p>
           </div>
         </div>
         
-        {/* 진행중 업무 카드 */}
         <div className="card-base p-5 flex flex-col justify-between h-32">
           <div className="flex justify-between items-start">
             <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400"><Clock size={20} /></div>
@@ -70,7 +106,6 @@ export default function Dashboard({ data, onRefresh }) {
           </div>
         </div>
 
-        {/* 긴급 이슈 카드 */}
         <div className="card-base p-5 flex flex-col justify-between h-32">
           <div className="flex justify-between items-start">
             <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400"><AlertCircle size={20} /></div>
@@ -82,24 +117,19 @@ export default function Dashboard({ data, onRefresh }) {
           </div>
         </div>
 
-        {/* 팀원 상태 카드 */}
         <div className="card-base p-5 flex flex-col justify-between h-32">
           <div className="flex justify-between items-start">
             <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-purple-600 dark:text-purple-400"><Calendar size={20} /></div>
           </div>
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">팀원 상태</p>
-            {/* ✅ 계산된 멤버 수 표시 */}
             <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{summary.onlineMembers}/{summary.totalMembers}명 온라인</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* [좌측 2칸] 메인: 팀 펄스 + 긴급 업무 */}
         <div className="lg:col-span-2 space-y-6">
-          
-          {/* Team Pulse 위젯 */}
           <div className="card-base p-6">
             <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <Zap size={18} className="text-yellow-500 fill-yellow-500" /> Team Pulse
@@ -111,24 +141,25 @@ export default function Dashboard({ data, onRefresh }) {
                     <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center font-bold text-slate-600 dark:text-slate-300">
                       {member.이름[0]}
                     </div>
+                    {/* ✅ 온라인이면 초록불, 아니면 회색불 */}
                     <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${
-                      member.상태 === '온라인' ? 'bg-green-500' : 
-                      member.상태 === '자리비움' ? 'bg-yellow-500' : 'bg-red-500'
+                      member.상태 === '온라인' ? 'bg-green-500' : 'bg-slate-300'
                     }`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center">
                       <p className="font-bold text-sm text-slate-800 dark:text-slate-200">{member.이름}</p>
-                      <span className="text-[10px] text-slate-400">{member.상태}</span>
+                      <span className={`text-[10px] ${member.상태 === '온라인' ? 'text-green-600 font-bold' : 'text-slate-400'}`}>
+                        {member.상태}
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">"{member.오늘의한마디 || '열심히 하겠습니다!'}"</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">"{member.오늘의한마디 || '화이팅!'}"</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 긴급 업무 리스트 */}
           <div className="card-base p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-slate-900 dark:text-white">우선순위 업무</h3>
@@ -153,10 +184,7 @@ export default function Dashboard({ data, onRefresh }) {
           </div>
         </div>
 
-        {/* [우측 1칸] 사이드: 퀵 링크 + 활동 로그 */}
         <div className="flex flex-col gap-6">
-          
-          {/* 퀵 링크 */}
           <div className="card-base p-6">
             <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <LinkIcon size={18} className="text-indigo-500" /> 퀵 링크
@@ -166,8 +194,8 @@ export default function Dashboard({ data, onRefresh }) {
                 <a 
                   key={i} 
                   href={link.URL} 
-                  target="_blank"             // ✅ 새 탭에서 열기
-                  rel="noopener noreferrer"   // ✅ 보안 옵션 추가
+                  target="_blank" 
+                  rel="noopener noreferrer"
                   className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors group"
                 >
                   <span className="text-slate-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 mb-2">
@@ -179,7 +207,6 @@ export default function Dashboard({ data, onRefresh }) {
             </div>
           </div>
 
-          {/* 활동 로그 */}
           <div className="card-base p-6 flex-1">
             <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <Activity size={18} className="text-slate-400" /> 활동 로그

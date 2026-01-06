@@ -20,7 +20,8 @@ const MenuBar = ({ editor }) => {
       editor.chain().focus().extendMarkRange('link').unsetLink().run()
       return
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+    // ✅ [수정] 링크 설정 시 target='_blank' 강제 적용
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url, target: '_blank' }).run()
   }
 
   return (
@@ -44,11 +45,19 @@ export default function Editor({ content, onChange, editable = true }) {
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Link.configure({ openOnClick: false, autolink: true })
+      // ✅ [수정] Link 설정: 클릭 시 새 탭 열기 (HTMLAttributes 적용)
+      Link.configure({ 
+        openOnClick: false, 
+        autolink: true,
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer',
+        }
+      })
     ],
     content: content,
     editable: editable,
-    immediatelyRender: false, // ✅ [수정] SSR Hydration 에러 방지 옵션 추가
+    immediatelyRender: false, 
     editorProps: {
       attributes: {
         class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[150px] p-4 text-sm leading-relaxed text-slate-700 dark:text-slate-200'
@@ -59,11 +68,10 @@ export default function Editor({ content, onChange, editable = true }) {
     }
   })
 
-  // 에디터가 로드되지 않았을 때 안전하게 null 반환
   if (!editor) return null
 
   return (
-    <div className={`border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900 transition-colors focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 ${!editable ? 'border-none bg-transparent' : ''}`}>
+    <div className={`border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900Ql transition-colors focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 ${!editable ? 'border-none bg-transparent' : ''}`}>
       {editable && <MenuBar editor={editor} />}
       <EditorContent editor={editor} />
     </div>
