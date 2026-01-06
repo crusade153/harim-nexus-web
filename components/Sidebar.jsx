@@ -2,7 +2,19 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, CheckSquare, Archive, CalendarDays, Users, Menu, X, LogOut, Megaphone } from 'lucide-react'
+import { 
+  LayoutDashboard, 
+  KanbanSquare, 
+  CheckSquare, 
+  Archive, 
+  CalendarDays, 
+  Users, 
+  Menu, 
+  X, 
+  LogOut, 
+  Megaphone,
+  GanttChartSquare // ✅ 추가된 아이콘
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -16,6 +28,8 @@ export default function Sidebar() {
   const menuItems = [
     { id: 'dashboard', name: '대시보드', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'kanban', name: '업무 보드', icon: KanbanSquare, path: '/kanban' }, 
+    // ✅ [추가됨] 프로젝트 타임라인 메뉴
+    { id: 'timeline', name: '프로젝트 타임라인', icon: GanttChartSquare, badge: 'Beta', path: '/timeline' },
     { id: 'todos', name: '프로젝트 & To-Do', icon: CheckSquare, badge: 'Action', path: '/todos' }, 
     { id: 'board', name: '게시판 & 이슈', icon: Megaphone, badge: 'New', path: '/board' },
     { id: 'archive', name: '팀 아카이브', icon: Archive, path: '/archive' }, 
@@ -23,12 +37,10 @@ export default function Sidebar() {
     { id: 'members', name: '팀원 관리', icon: Users, path: '/members' },
   ]
 
-  // ✅ [수정] 접속 시 내 정보 로드 + Presence(접속신호) 추적 시작
   useEffect(() => {
     let channel = null;
 
     const initSidebar = async () => {
-      // 1. 내 정보 가져오기
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user) {
@@ -46,19 +58,16 @@ export default function Sidebar() {
             loginId: member.login_id
           })
 
-          // 2. ✅ 실시간 접속 신호 보내기 (Presence Tracking)
-          // 'room_presence'라는 채널에 접속하여 내 login_id를 방송합니다.
           channel = supabase.channel('room_presence', {
             config: {
               presence: {
-                key: member.login_id, // 고유 식별자로 로그인 ID 사용
+                key: member.login_id, 
               },
             },
           })
 
           channel.subscribe(async (status) => {
             if (status === 'SUBSCRIBED') {
-              // 채널 연결 성공 시 상태 전송
               await channel.track({
                 user_id: member.login_id,
                 online_at: new Date().toISOString(),
@@ -71,7 +80,6 @@ export default function Sidebar() {
 
     initSidebar()
 
-    // 3. 컴포넌트 언마운트(종료) 시 채널 나가기
     return () => {
       if (channel) {
         supabase.removeChannel(channel)

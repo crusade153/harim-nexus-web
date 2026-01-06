@@ -1,173 +1,131 @@
 'use client'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-// ✅ Edit2 아이콘 추가
-import { Plus, CheckCircle2, Circle, Calendar, X, FolderPlus, Trash2, Edit2 } from 'lucide-react'
-import { createProject, createTodo, toggleTodo, deleteProject, deleteTodo, updateProject } from '@/lib/sheets' 
+import { CheckCircle2, Circle, Calendar, Folder, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import { toggleTaskStatus } from '@/lib/sheets' // ✅ tasks 테이블 상태 토글 함수 사용
 
 export default function TodoListPage({ projects = [], currentUser, onRefresh }) {
   const [activeProjectID, setActiveProjectID] = useState(null)
   const [localProjects, setLocalProjects] = useState(projects)
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
-  const [isTodoModalOpen, setIsTodoModalOpen] = useState(false)
-  
-  // ✅ [수정] 수정 모드 및 프로젝트 상태 관리 통합
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [projectForm, setProjectForm] = useState({ 제목: '', 기간: '' })
-
-  const [newTodo, setNewTodo] = useState({ 항목: '', 담당자: '' })
-  
-  const isAdmin = currentUser?.아이디 === 'crusade153'
 
   useEffect(() => { setLocalProjects(projects) }, [projects])
   useEffect(() => { if (!activeProjectID && projects.length > 0) setActiveProjectID(projects[0].ID) }, [projects, activeProjectID])
 
   const activeProject = localProjects.find(p => p.ID === activeProjectID) || localProjects[0]
-  const calculateProgress = (todos) => { if (!todos || todos.length === 0) return 0; const completed = todos.filter(t => t.완료).length; return Math.round((completed / todos.length) * 100) }
 
-  const handleCheck = async (todoId, currentStatus) => {
-    const updatedProjects = localProjects.map(p => { if (p.ID === activeProject.ID) { return { ...p, todos: p.todos.map(t => t.ID === todoId ? { ...t, 완료: !currentStatus } : t) } } return p })
+  const calculateProgress = (todos) => { 
+    if (!todos || todos.length === 0) return 0; 
+    const completed = todos.filter(t => t.완료).length; 
+    return Math.round((completed / todos.length) * 100) 
+  }
+
+  // ✅ 체크 상태 변경 (tasks 테이블의 status 업데이트)
+  const handleCheck = async (taskId, currentIsDone) => {
+    // 1. 낙관적 UI 업데이트
+    const updatedProjects = localProjects.map(p => { 
+        if (p.ID === activeProject.ID) { 
+            return { 
+                ...p, 
+                todos: p.todos.map(t => t.ID === taskId ? { ...t, 완료: !currentIsDone } : t) 
+            } 
+        } 
+        return p 
+    })
     setLocalProjects(updatedProjects)
-    try { await toggleTodo(todoId, currentStatus); if (onRefresh) onRefresh() } catch (error) { setLocalProjects(projects) }
-  }
 
-  // ✅ [수정] 프로젝트 생성 및 수정 핸들러
-  const handleSaveProject = async () => {
-    if (!projectForm.제목.trim()) { toast.error('제목 입력!'); return }
-    
-    try {
-        if (isEditMode) {
-            await updateProject(activeProjectID, projectForm)
-            toast.success('프로젝트가 수정되었습니다.')
-        } else {
-            await createProject({ 
-                제목: projectForm.제목, 
-                기간: projectForm.기간 || '2026.01.01 ~ 2026.12.31', 
-                작성자: currentUser?.이름 || '익명' 
-            })
-            toast.success('프로젝트 생성!')
-        }
-        setProjectForm({ 제목: '', 기간: '' })
-        setIsProjectModalOpen(false)
-        setIsEditMode(false)
-        if (onRefresh) onRefresh()
-    } catch (error) { toast.error('실패') }
-  }
-
-  // ✅ 수정 모달 열기
-  const openEditProject = (e, project) => {
-    e.stopPropagation()
-    setProjectForm({ 제목: project.제목, 기간: project.기간 })
-    setActiveProjectID(project.ID)
-    setIsEditMode(true)
-    setIsProjectModalOpen(true)
-  }
-
-  // ✅ 생성 모달 열기
-  const openCreateProject = () => {
-    setProjectForm({ 제목: '', 기간: '' })
-    setIsEditMode(false)
-    setIsProjectModalOpen(true)
-  }
-
-  const handleSaveTodo = async () => {
-    if (!activeProject) return toast.error('프로젝트 선택!'); if (!newTodo.항목.trim()) { toast.error('내용 입력!'); return }
-    try { await createTodo({ projectID: activeProject.ID, 항목: newTodo.항목, 담당자: newTodo.담당자 || currentUser?.이름 || '담당자' }); toast.success('할일 추가!'); setNewTodo({ 항목: '', 담당자: '' }); setIsTodoModalOpen(false); if (onRefresh) onRefresh() } catch (error) { toast.error('실패') }
-  }
-
-  const handleDeleteProject = async (projectId) => {
-    if(!confirm('프로젝트와 포함된 할 일이 모두 삭제됩니다. 계속하시겠습니까?')) return
-    try {
-        await deleteProject(projectId)
-        toast.success('프로젝트 삭제 완료')
-        setActiveProjectID(null)
-        if(onRefresh) onRefresh()
-    } catch(e) { toast.error('삭제 실패') }
-  }
-
-  const handleDeleteTodo = async (todoId) => {
-    if(!confirm('할 일을 삭제하시겠습니까?')) return
-    try { await deleteTodo(todoId); toast.success('삭제되었습니다.'); if(onRefresh) onRefresh() } catch(e) { toast.error('삭제 실패') }
+    // 2. DB 업데이트
+    try { 
+        await toggleTaskStatus(taskId, currentIsDone); 
+        if (onRefresh) onRefresh() 
+    } catch (error) { 
+        toast.error('상태 변경 실패')
+        setLocalProjects(projects) // 롤백
+    }
   }
 
   return (
     <div className="h-full flex flex-col md:flex-row gap-6 relative">
+      {/* 좌측: 프로젝트 목록 */}
       <div className="w-full md:w-80 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">프로젝트</h2>
-          <button onClick={openCreateProject} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors"><Plus size={20} /></button>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">To-Do 체크리스트</h2>
         </div>
         <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-200px)] custom-scrollbar">
           {localProjects.map(project => {
             const progress = calculateProgress(project.todos)
             const isActive = activeProject?.ID === project.ID
             return (
-              <div key={project.ID} onClick={() => setActiveProjectID(project.ID)} className={`relative p-4 rounded-xl border cursor-pointer transition-all group ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 ring-1 ring-indigo-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}>
-                <div className="flex justify-between items-start mb-2"><h3 className={`font-bold truncate ${isActive ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>{project.제목}</h3>{isActive && <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0" />}</div>
-                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-3"><Calendar size={12} /> {project.기간}</div>
+              <div key={project.ID} onClick={() => setActiveProjectID(project.ID)} className={`relative p-4 rounded-xl border cursor-pointer transition-all ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 ring-1 ring-indigo-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}>
+                <div className="flex justify-between items-start mb-2">
+                    <h3 className={`font-bold truncate ${isActive ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>{project.제목}</h3>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-3"><Calendar size={12} /> {project.기간 || '기간 미설정'}</div>
                 <div className="flex items-center gap-2"><div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{width: `${progress}%`}} /></div><span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{progress}%</span></div>
-                
-                {/* 프로젝트 수정/삭제 버튼 (작성자/관리자) */}
-                {(currentUser?.이름 === project.작성자 || isAdmin) && (
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={(e) => openEditProject(e, project)} className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded"><Edit2 size={14}/></button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.ID); }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 size={14}/></button>
-                    </div>
-                )}
               </div>
             )
           })}
         </div>
+        
+        {/* 안내 메시지 */}
+        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl text-xs text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700">
+            💡 프로젝트 생성 및 업무 추가는 <br/>
+            <Link href="/timeline" className="text-indigo-600 font-bold hover:underline">프로젝트 타임라인</Link> 메뉴를 이용해주세요.
+        </div>
       </div>
 
+      {/* 우측: 할 일 목록 (체크박스) */}
       <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 flex flex-col h-[calc(100vh-140px)] shadow-sm">
         {activeProject ? (
           <>
             <div className="flex justify-between items-start mb-8 pb-6 border-b border-slate-100 dark:border-slate-700">
-              <div><h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{activeProject.제목}</h1><p className="text-sm text-slate-500 dark:text-slate-400">작성자: {activeProject.작성자} · 총 {activeProject.todos?.length || 0}개의 할 일</p></div>
-              <div className="text-right"><span className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{calculateProgress(activeProject.todos)}%</span><p className="text-xs text-slate-400 uppercase font-bold">진행률</p></div>
+              <div>
+                  <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{activeProject.제목}</h1>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">총 {activeProject.todos?.length || 0}개의 할 일</p>
+              </div>
+              <div className="text-right">
+                  <span className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{calculateProgress(activeProject.todos)}%</span>
+                  <p className="text-xs text-slate-400 uppercase font-bold">완료율</p>
+              </div>
             </div>
+
             <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
-              {activeProject.todos?.map(todo => (
+              {activeProject.todos?.length > 0 ? activeProject.todos.map(todo => (
                 <div key={todo.ID} className="group flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
-                  <div className="flex items-center gap-4 flex-1">
-                    <button onClick={() => handleCheck(todo.ID, todo.완료)} className={`transition-colors ${todo.완료 ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-400'}`}>{todo.완료 ? <CheckCircle2 size={24} /> : <Circle size={24} />}</button>
-                    <div><p className={`font-medium text-sm transition-all ${todo.완료 ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-800 dark:text-slate-200'}`}>{todo.항목}</p></div>
+                  <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => handleCheck(todo.ID, todo.완료)}>
+                    <button className={`transition-colors ${todo.완료 ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-400'}`}>
+                        {todo.완료 ? <CheckCircle2 size={24} /> : <Circle size={24} />}
+                    </button>
+                    <div>
+                        <p className={`font-medium text-sm transition-all ${todo.완료 ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-800 dark:text-slate-200'}`}>{todo.항목}</p>
+                        <p className="text-xs text-slate-400 mt-0.5 flex gap-2">
+                            <span>{todo.담당자}</span>
+                            {todo.마감일 && <span>· ~{todo.마감일}</span>}
+                        </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-xs font-medium text-slate-600 dark:text-slate-300"><span className="text-slate-400">담당</span> {todo.담당자}</div>
-                    <button onClick={() => handleDeleteTodo(todo.ID)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1"><X size={14}/></button>
-                  </div>
+                  {/* 상태 뱃지 */}
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${todo.완료 ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                    {todo.상태 || (todo.완료 ? '완료' : '대기')}
+                  </span>
                 </div>
-              ))}
-              <button onClick={() => setIsTodoModalOpen(true)} className="w-full py-3 mt-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-indigo-500 hover:border-indigo-300 transition-all flex items-center justify-center gap-2 font-medium text-sm"><Plus size={18} /> 새 할 일 추가</button>
+              )) : (
+                <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+                    <p>등록된 할 일이 없습니다.</p>
+                    <Link href="/timeline" className="mt-2 text-sm text-indigo-500 flex items-center gap-1 hover:underline">
+                        타임라인에서 추가하기 <ArrowRight size={14}/>
+                    </Link>
+                </div>
+              )}
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400"><FolderPlus size={48} className="mb-4 opacity-20" /><p>프로젝트를 선택하세요.</p></div>
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+            <Folder size={48} className="mb-4 opacity-20" />
+            <p>프로젝트를 선택하세요.</p>
+          </div>
         )}
       </div>
-
-      {isProjectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{isEditMode ? '프로젝트 수정' : '새 프로젝트'}</h3>
-            <input type="text" value={projectForm.제목} onChange={e => setProjectForm({...projectForm, 제목: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl mb-3"Zh placeholder="프로젝트 제목" autoFocus />
-            <input type="text" value={projectForm.기간} onChange={e => setProjectForm({...projectForm, 기간: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl" placeholder="기간 (예: 2026.01.01 ~)" />
-            <div className="flex gap-3 mt-6"><button onClick={() => setIsProjectModalOpen(false)} className="flex-1 btn-secondary">취소</button><button onClick={handleSaveProject} className="flex-1 btn-primary">{isEditMode ? '수정' : '생성'}</button></div>
-          </div>
-        </div>
-      )}
-      {isTodoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">새 할 일</h3>
-            <input type="text" value={newTodo.항목} onChange={e => setNewTodo({...newTodo, 항목: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl mb-3" placeholder="할 일 내용" autoFocus />
-            <input type="text" value={newTodo.담당자} onChange={e => setNewTodo({...newTodo, 담당자: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl" placeholder="담당자 이름" />
-            <div className="flex gap-3 mt-6"><button onClick={() => setIsTodoModalOpen(false)} className="flex-1 btn-secondary">취소</button><button onClick={handleSaveTodo} className="flex-1 btn-primary">추가</button></div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
