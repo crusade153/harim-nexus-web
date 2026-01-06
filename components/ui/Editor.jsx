@@ -71,7 +71,7 @@ export default function Editor({ content, onChange, editable = true }) {
   if (!editor) return null
 
   return (
-    <div className={`border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900Ql transition-colors focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 ${!editable ? 'border-none bg-transparent' : ''}`}>
+    <div className={`border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900 transition-colors focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 ${!editable ? 'border-none bg-transparent' : ''}`}>
       {editable && <MenuBar editor={editor} />}
       <EditorContent editor={editor} />
     </div>
