@@ -13,7 +13,7 @@ import {
   X, 
   LogOut, 
   Megaphone,
-  GanttChartSquare // ✅ 추가된 아이콘
+  GanttChartSquare 
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
@@ -28,8 +28,8 @@ export default function Sidebar() {
   const menuItems = [
     { id: 'dashboard', name: '대시보드', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'kanban', name: '업무 보드', icon: KanbanSquare, path: '/kanban' }, 
-    // ✅ [추가됨] 프로젝트 타임라인 메뉴
-    { id: 'timeline', name: '프로젝트 타임라인', icon: GanttChartSquare, badge: 'Beta', path: '/timeline' },
+    // ✅ [수정됨] 이름: 프로젝트 WBS / 배지: Schedule
+    { id: 'timeline', name: '프로젝트 WBS', icon: GanttChartSquare, badge: 'Schedule', path: '/timeline' },
     { id: 'todos', name: '프로젝트 & To-Do', icon: CheckSquare, badge: 'Action', path: '/todos' }, 
     { id: 'board', name: '게시판 & 이슈', icon: Megaphone, badge: 'New', path: '/board' },
     { id: 'archive', name: '팀 아카이브', icon: Archive, path: '/archive' }, 
@@ -59,11 +59,7 @@ export default function Sidebar() {
           })
 
           channel = supabase.channel('room_presence', {
-            config: {
-              presence: {
-                key: member.login_id, 
-              },
-            },
+            config: { presence: { key: member.login_id } },
           })
 
           channel.subscribe(async (status) => {

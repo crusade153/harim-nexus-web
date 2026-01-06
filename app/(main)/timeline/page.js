@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import GanttChart from '@/components/GanttChart'
 import Skeleton from '@/components/Skeleton'
 import { getRealData, getProjectTasks, createTask, updateTask, deleteProject, createProject, updateProject, deleteTask } from '@/lib/sheets'
-import { Plus, Folder, Calendar, Edit2, Trash2, X, Save, Clock, ArrowRight } from 'lucide-react'
+import { Plus, Folder, Calendar, Edit2, Trash2, X, Save, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function TimelinePage() {
@@ -71,13 +71,13 @@ export default function TimelinePage() {
   }
 
   const handleDeleteProject = async (id) => {
-    if (!confirm('프로젝트를 삭제하시겠습니까? (연결된 업무는 유지됩니다)')) return
+    if (!confirm('경고: 프로젝트를 삭제하면 포함된 모든 업무와 일정이 영구 삭제됩니다. 진행하시겠습니까?')) return
     try {
       await deleteProject(id)
-      toast.success('삭제되었습니다.')
+      toast.success('프로젝트 및 하위 업무가 삭제되었습니다.')
       setSelectedProjectId(null)
       loadProjects()
-    } catch (e) { toast.error('삭제 실패') }
+    } catch (e) { toast.error('삭제 실패 (DB 오류)') }
   }
 
   const handleOpenTaskModal = (task = null) => {
@@ -123,10 +123,7 @@ export default function TimelinePage() {
       }
       setIsTaskModalOpen(false)
       refreshTasks()
-    } catch (e) { 
-        console.error(e)
-        toast.error('저장 실패') 
-    }
+    } catch (e) { toast.error('저장 실패') }
   }
 
   const handleDeleteTask = async () => {
@@ -140,7 +137,6 @@ export default function TimelinePage() {
     } catch (e) { toast.error('삭제 실패') }
   }
 
-  // ✅ 간트차트에서 바를 클릭했을 때 실행 (라이브러리 객체를 원본 DB 객체로 매핑)
   const onGanttTaskClick = (task) => {
     const originalTask = tasks.find(t => String(t.id) === task.id)
     if (originalTask) handleOpenTaskModal(originalTask)
@@ -150,11 +146,10 @@ export default function TimelinePage() {
 
   return (
     <div className="h-full flex flex-col space-y-6 pb-10">
-      {/* 헤더 & 프로젝트 관리 */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Calendar className="text-indigo-600"/> 프로젝트 타임라인
+            <Calendar className="text-indigo-600"/> 프로젝트 WBS
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">프로젝트별 일정을 계획하고 관리합니다.</p>
         </div>
@@ -163,17 +158,15 @@ export default function TimelinePage() {
         </button>
       </div>
 
-      {/* 프로젝트 탭 리스트 */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide min-h-[50px]">
         {projects.map(p => (
           <div key={p.ID} className={`group relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap border transition-all cursor-pointer ${
             selectedProjectId === p.ID
               ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-              : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+              : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
           }`} onClick={() => setSelectedProjectId(p.ID)}>
             <Folder size={16} /> {p.제목}
             
-            {/* 프로젝트 수정/삭제 버튼 */}
             {selectedProjectId === p.ID && (
                <div className="ml-2 pl-2 border-l border-white/20 flex gap-1">
                  <button onClick={(e) => { e.stopPropagation(); handleOpenProjectModal(p); }} className="p-1 hover:bg-indigo-500 rounded"><Edit2 size={12}/></button>
@@ -184,13 +177,10 @@ export default function TimelinePage() {
         ))}
       </div>
 
-      {/* 메인 컨텐츠 영역 */}
       <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden relative">
         {selectedProjectId ? (
           <>
-            {/* ✅ 상단 툴바 (버튼 위치 수정됨) */}
             <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/20">
-              {/* 왼쪽: 일정 추가 버튼 */}
               <div className="flex items-center gap-3">
                 <button onClick={() => handleOpenTaskModal()} className="btn-primary py-2 px-4 text-xs font-bold shadow-indigo-100">
                     <Plus size={16}/> 일정 추가
@@ -200,19 +190,16 @@ export default function TimelinePage() {
                     <Clock size={16} className="text-slate-400"/> 일정 관리 모드
                 </span>
               </div>
-              
-              {/* 오른쪽: 도움말 */}
               <p className="text-xs text-slate-400 hidden md:block">
                 일정을 클릭하여 수정하거나, 드래그하여 기간을 변경하세요.
               </p>
             </div>
             
-            {/* 간트 차트 */}
             <div className="flex-1 overflow-auto p-4 min-h-[400px]">
                <GanttChart 
                  tasks={tasks} 
                  onTaskChange={refreshTasks} 
-                 onTaskClick={onGanttTaskClick} // ✅ 클릭 시 수정창 열기 연결
+                 onTaskClick={onGanttTaskClick} 
                />
             </div>
           </>
@@ -224,7 +211,6 @@ export default function TimelinePage() {
         )}
       </div>
 
-      {/* 프로젝트 모달은 기존과 동일 */}
       {isProjectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative">
@@ -239,7 +225,6 @@ export default function TimelinePage() {
         </div>
       )}
 
-      {/* 업무(일정) 추가/수정 모달 */}
       {isTaskModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in zoom-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative flex flex-col max-h-[90vh]">

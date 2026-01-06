@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 export default function Dashboard({ data, onRefresh }) {
   const [onlineUserIds, setOnlineUserIds] = useState(new Set())
   
-  // ✅ 내 아이디 확인 (데이터에서 가져옴)
+  // 내 아이디 확인
   const myLoginId = data?.currentUser?.아이디
 
   useEffect(() => {
@@ -19,8 +19,6 @@ export default function Dashboard({ data, onRefresh }) {
     channel
       .on('presence', { event: 'sync' }, () => {
         const newState = channel.presenceState()
-        console.log('📡 [Dashboard] 접속자 명단 수신:', newState) // 디버깅용 로그
-        
         const userIds = new Set()
         for (const id in newState) {
           userIds.add(id)
@@ -29,7 +27,7 @@ export default function Dashboard({ data, onRefresh }) {
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log('✅ [Dashboard] 실시간 채널 연결됨')
+          // 접속 시그널 로직 (필요 시 추가)
         }
       })
 
@@ -43,10 +41,8 @@ export default function Dashboard({ data, onRefresh }) {
     const rawMembers = data?.members || []
     
     const members = rawMembers.map(m => {
-      // ✅ [핵심 수정] 내 아이디거나, 리스트에 있으면 '온라인' 처리
       const isMe = m.아이디 === myLoginId
       const isOnline = onlineUserIds.has(m.아이디)
-      
       return {
         ...m,
         상태: (isMe || isOnline) ? '온라인' : '오프라인'
@@ -83,6 +79,7 @@ export default function Dashboard({ data, onRefresh }) {
         </button>
       </div>
 
+      {/* 상단 통계 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card-base p-5 flex flex-col justify-between h-32">
           <div className="flex justify-between items-start">
@@ -130,6 +127,7 @@ export default function Dashboard({ data, onRefresh }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          {/* Team Pulse (멤버 상태) */}
           <div className="card-base p-6">
             <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <Zap size={18} className="text-yellow-500 fill-yellow-500" /> Team Pulse
@@ -141,7 +139,6 @@ export default function Dashboard({ data, onRefresh }) {
                     <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center font-bold text-slate-600 dark:text-slate-300">
                       {member.이름[0]}
                     </div>
-                    {/* ✅ 온라인이면 초록불, 아니면 회색불 */}
                     <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${
                       member.상태 === '온라인' ? 'bg-green-500' : 'bg-slate-300'
                     }`} />
@@ -160,13 +157,15 @@ export default function Dashboard({ data, onRefresh }) {
             </div>
           </div>
 
+          {/* 우선순위 업무 (최근 6개 제한) */}
           <div className="card-base p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-slate-900 dark:text-white">우선순위 업무</h3>
-              <button className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-medium">더보기</button>
+              <span className="text-xs text-slate-400 font-medium">최근 6건 표시</span>
             </div>
             <div className="space-y-1">
-              {summary.urgentTasks.concat(summary.ongoingTasks).slice(0, 4).map((task, i) => (
+              {/* ✅ 여기서 slice(0, 6) 적용 */}
+              {summary.urgentTasks.concat(summary.ongoingTasks).slice(0, 6).map((task, i) => (
                 <div key={i} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
                    <div className="flex items-center gap-3">
                      <span className={`w-1.5 h-1.5 rounded-full ${task.우선순위 === '높음' ? 'bg-red-500' : 'bg-green-500'}`} />
@@ -180,11 +179,15 @@ export default function Dashboard({ data, onRefresh }) {
                    </div>
                 </div>
               ))}
+              {summary.urgentTasks.length + summary.ongoingTasks.length === 0 && (
+                <div className="text-center py-4 text-slate-400 text-sm">진행 중인 우선순위 업무가 없습니다.</div>
+              )}
             </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-6">
+          {/* 퀵 링크 */}
           <div className="card-base p-6">
             <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <LinkIcon size={18} className="text-indigo-500" /> 퀵 링크
@@ -207,13 +210,15 @@ export default function Dashboard({ data, onRefresh }) {
             </div>
           </div>
 
+          {/* 활동 로그 (최근 6개 제한) */}
           <div className="card-base p-6 flex-1">
             <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <Activity size={18} className="text-slate-400" /> 활동 로그
             </h3>
             <div className="relative pl-2 space-y-6">
               <div className="absolute left-[7px] top-2 bottom-2 w-px bg-slate-100 dark:bg-slate-700" />
-              {summary.recentActivities.map((log, i) => (
+              {/* ✅ 여기서도 slice(0, 6) 적용 */}
+              {summary.recentActivities.slice(0, 6).map((log, i) => (
                 <div key={i} className="relative flex gap-3 text-sm">
                   <div className="w-3 h-3 rounded-full bg-slate-200 dark:bg-slate-600 border-2 border-white dark:border-slate-800 z-10 shrink-0 mt-1" />
                   <div>
@@ -224,6 +229,9 @@ export default function Dashboard({ data, onRefresh }) {
                   </div>
                 </div>
               ))}
+              {summary.recentActivities.length === 0 && (
+                <div className="text-slate-400 text-xs pl-4">최근 활동 내역이 없습니다.</div>
+              )}
             </div>
           </div>
         </div>
