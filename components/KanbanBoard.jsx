@@ -3,39 +3,16 @@ import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import Link from 'next/link' 
 import { 
-  Plus, 
-  MessageSquare, 
-  Calendar, 
-  User, 
-  AlignLeft, 
-  Send, 
-  CheckCircle2, 
-  ChevronDown, 
-  ChevronUp, 
-  Link as LinkIcon, 
-  ExternalLink, 
-  X, 
-  Trash2,
-  Save,      
-  Edit2      
+  Plus, MessageSquare, Calendar, User, AlignLeft, Send, CheckCircle2, 
+  ChevronDown, ChevronUp, Link as LinkIcon, ExternalLink, X, Trash2, Save, Edit2      
 } from 'lucide-react'
 import {
-  DndContext,
-  DragOverlay,
-  closestCorners,
-  pointerWithin,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  useDroppable,
+  DndContext, DragOverlay, closestCorners, pointerWithin, KeyboardSensor, 
+  PointerSensor, useSensor, useSensors, useDroppable,
 } from '@dnd-kit/core'
 import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
+  SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, 
+  useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
@@ -164,7 +141,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     setItems(initialTasks)
   }, [initialTasks])
 
-  // 현재 로그인한 유저를 담당자 기본값으로
   useEffect(() => {
     if(isTaskModalOpen && currentUser) {
         setNewTask(prev => ({...prev, 담당자명: currentUser.이름}))
@@ -236,7 +212,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
 
   // --- 기타 핸들러 ---
 
-  // 상태 변경
   const handleStatusChange = async (newStatus) => {
     if (!selectedTask) return
     const updatedItems = items.map(item => item.ID === selectedTask.ID ? { ...item, 상태: newStatus } : item)
@@ -251,7 +226,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // 새 업무 생성
   const handleCreateTask = async () => {
     if (!newTask.제목) { toast.error('업무 제목을 입력해주세요.'); return }
     try {
@@ -266,11 +240,12 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // 업무 삭제
+  // ✅ [수정] 업무 삭제 시 이름 전달
   const handleDeleteTask = async () => {
     if(!confirm('정말 이 업무를 삭제하시겠습니까?')) return
     try {
-      await deleteTask(selectedTask.ID)
+      // ✅ currentUser.이름 전달
+      await deleteTask(selectedTask.ID, currentUser?.이름)
       toast.success('업무가 삭제되었습니다.')
       setSelectedTask(null)
       if(onRefresh) onRefresh()
@@ -279,12 +254,10 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // ✅ [수정] 업무 내용 변경 (상세보기에서 수정)
   const handleTaskUpdate = (field, value) => {
     setSelectedTask(prev => ({ ...prev, [field]: value }))
   }
 
-  // ✅ [수정] 변경 사항 저장 핸들러 - 실명 로그를 위해 사용자 이름 전달
   const handleSaveChanges = async () => {
     if(!selectedTask) return
     try {
@@ -294,9 +267,8 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
             담당자명: selectedTask.담당자명,
             마감일: selectedTask.마감일,
             우선순위: selectedTask.우선순위
-        }, currentUser?.이름 || '알 수 없음') // ✅ 사용자 이름 전달
+        }, currentUser?.이름 || '알 수 없음')
         
-        // 목록 상태 업데이트
         setItems(items.map(i => i.ID === selectedTask.ID ? selectedTask : i))
         toast.success('업무 정보가 수정되었습니다.')
     } catch (error) {
@@ -305,7 +277,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // 댓글 추가
   const handleAddComment = async (e) => {
     e.preventDefault()
     const comment = e.target.comment.value
@@ -327,7 +298,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     }
   }
 
-  // ✅ [수정] 위키 연결 핸들러 - 사용자 이름 전달 (필요 시)
   const handleLinkWiki = async (wikiId) => {
     const updated = { ...selectedTask, 관련문서ID: wikiId }
     setSelectedTask(updated)
@@ -347,7 +317,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
   return (
     <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="space-y-4 h-full flex flex-col">
-        {/* 상단 헤더 */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">업무 보드</h1>
@@ -363,7 +332,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           </div>
         </div>
 
-        {/* 모바일 탭 */}
         <div className="flex md:hidden bg-slate-100 dark:bg-slate-800 p-1 rounded-xl overflow-x-auto scrollbar-hide">
           {columns.map(col => (
             <button key={col} onClick={() => setActiveMobileColumn(col)} className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${activeMobileColumn === col ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
@@ -372,7 +340,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           ))}
         </div>
 
-        {/* 메인 칸반 그리드 */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 overflow-hidden min-h-[500px]">
           {columns.map(status => {
             const isHiddenMobile = status !== activeMobileColumn
@@ -393,7 +360,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           })}
         </div>
 
-        {/* 드래그 오버레이 */}
         <DragOverlay dropAnimation={null}>
           {activeItem ? (
             <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-indigo-500 shadow-xl opacity-90 rotate-2 cursor-grabbing w-[300px] pointer-events-none">
@@ -402,13 +368,11 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           ) : null}
         </DragOverlay>
 
-        {/* ✏️ 업무 상세 및 수정 Drawer */}
         <Drawer isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="업무 상세 및 수정">
           {selectedTask && (
             <div className="space-y-8 pb-10">
               <div className="flex justify-between items-start">
                 <div className="flex-1 pr-4 space-y-3">
-                    {/* 상태 및 ID */}
                     <div className="flex items-center gap-2">
                         <select 
                             value={selectedTask.상태} 
@@ -419,7 +383,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                         </select>
                         <span className="text-xs text-slate-400">ID: #{selectedTask.ID}</span>
                     </div>
-                    {/* ✏️ 제목 수정 인풋 */}
                     <input 
                       type="text" 
                       value={selectedTask.제목} 
@@ -429,11 +392,9 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                 </div>
                 
                 <div className="flex gap-2">
-                    {/* ✅ 저장 버튼 */}
                     <button onClick={handleSaveChanges} className="p-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm transition-colors" title="변경사항 저장">
                         <Save size={20} />
                     </button>
-                    {/* 삭제 버튼 */}
                     {(currentUser?.이름 === selectedTask.담당자명 || isAdmin) && (
                         <button onClick={handleDeleteTask} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="업무 삭제">
                             <Trash2 size={20} />
@@ -442,7 +403,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                 </div>
               </div>
               
-              {/* 위키 연결 섹션 */}
               <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
                 <h3 className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-3 flex items-center gap-2">
                   <LinkIcon size={16} /> 관련 지식/문서
@@ -460,7 +420,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                         </p>
                       </div>
                     </div>
-                    {/* ✅ Link 컴포넌트로 이동 */}
                     <Link 
                       href={`/archive?search=${encodeURIComponent(linkedWikiDoc?.제목 || '')}`} 
                       className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 p-2 hover:bg-indigo-50 dark:hover:bg-slate-700 rounded"
@@ -480,7 +439,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                 )}
               </div>
 
-              {/* 담당자 및 마감일 수정 */}
               <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
                 <div className="space-y-1">
                   <p className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1">
@@ -506,7 +464,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                 </div>
               </div>
 
-              {/* 내용 수정 */}
               <div>
                 <p className="text-xs text-slate-400 font-bold uppercase mb-2 flex items-center gap-2">
                   <AlignLeft size={14}/> 상세 내용
@@ -559,7 +516,6 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
           )}
         </Drawer>
 
-        {/* 새 업무 추가 모달 */}
         {isTaskModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl relative flex flex-col max-h-[90vh]">

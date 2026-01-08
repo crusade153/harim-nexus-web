@@ -59,7 +59,7 @@ export default function TimelinePage() {
     if (!projectForm.제목) return toast.error('프로젝트 제목을 입력하세요.')
     try {
       if (editingProject) {
-        await updateProject(editingProject.ID, { ...projectForm })
+        await updateProject(editingProject.ID, { ...projectForm }, currentUser?.이름)
         toast.success('프로젝트 수정 완료')
       } else {
         await createProject({ ...projectForm, 작성자: currentUser?.이름 })
@@ -73,7 +73,8 @@ export default function TimelinePage() {
   const handleDeleteProject = async (id) => {
     if (!confirm('경고: 프로젝트를 삭제하면 포함된 모든 업무와 일정이 영구 삭제됩니다. 진행하시겠습니까?')) return
     try {
-      await deleteProject(id)
+      // ✅ [수정] 삭제 시 사용자 이름 전달
+      await deleteProject(id, currentUser?.이름)
       toast.success('프로젝트 및 하위 업무가 삭제되었습니다.')
       setSelectedProjectId(null)
       loadProjects()
@@ -115,7 +116,7 @@ export default function TimelinePage() {
       }
 
       if (editingTask) {
-        await updateTask(editingTask.id || editingTask.ID, payload)
+        await updateTask(editingTask.id || editingTask.ID, payload, currentUser?.이름)
         toast.success('일정이 수정되었습니다.')
       } else {
         await createTask(payload)
@@ -130,7 +131,8 @@ export default function TimelinePage() {
     if (!editingTask) return
     if (!confirm('정말 삭제하시겠습니까?')) return
     try {
-        await deleteTask(editingTask.id || editingTask.ID)
+        // ✅ [수정] 삭제 시 사용자 이름 전달
+        await deleteTask(editingTask.id || editingTask.ID, currentUser?.이름)
         toast.success('삭제되었습니다.')
         setIsTaskModalOpen(false)
         refreshTasks()

@@ -8,7 +8,7 @@ import { createArchive, createComment, deleteArchive, updateArchive } from '@/li
 export default function ArchivePage({ archives = [], currentUser, onRefresh }) {
   const [selectedDoc, setSelectedDoc] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isEditMode, setIsEditMode] = useState(false) // 수정 모드 상태
+  const [isEditMode, setIsEditMode] = useState(false) 
   const [newArchive, setNewArchive] = useState({ 카테고리: '매뉴얼', 제목: '', 링크: '', 내용: '' })
   const [commentInput, setCommentInput] = useState('')
   const categories = ['매뉴얼', '온보딩', '트러블슈팅', '기타']
@@ -23,12 +23,11 @@ export default function ArchivePage({ archives = [], currentUser, onRefresh }) {
     }
   }, [archives, selectedDoc])
 
-  // ✅ 작성/수정 핸들러
   const handleSave = async () => {
     if (!newArchive.제목) { toast.error('제목을 입력해주세요!'); return }
     try {
       if (isEditMode) {
-        await updateArchive(selectedDoc.ID, newArchive)
+        await updateArchive(selectedDoc.ID, newArchive, currentUser?.이름)
         toast.success('문서가 수정되었습니다.')
       } else {
         await createArchive({ ...newArchive, 작성자: currentUser?.이름 || '익명' })
@@ -41,17 +40,18 @@ export default function ArchivePage({ archives = [], currentUser, onRefresh }) {
     } catch (error) { toast.error('저장 실패') }
   }
 
+  // ✅ [수정] 삭제 시 userName 전달
   const handleDelete = async () => {
     if(!confirm('문서를 삭제하시겠습니까?')) return
     try {
-      await deleteArchive(selectedDoc.ID)
+      // ✅ currentUser.이름 전달
+      await deleteArchive(selectedDoc.ID, currentUser?.이름)
       toast.success('문서가 삭제되었습니다.')
       setSelectedDoc(null)
       if (onRefresh) onRefresh()
     } catch (e) { toast.error('삭제 실패') }
   }
 
-  // ✅ 수정 모달 열기
   const openEditModal = () => {
     setNewArchive({
         카테고리: selectedDoc.카테고리,
@@ -98,7 +98,6 @@ export default function ArchivePage({ archives = [], currentUser, onRefresh }) {
                     <div className="flex items-center gap-2 mb-4"><span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800">{selectedDoc.카테고리}</span><span className="text-xs text-slate-400">최종 수정: {selectedDoc.날짜}</span></div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white leading-tight">{selectedDoc.제목}</h1>
                 </div>
-                {/* ✅ 수정/삭제 버튼 */}
                 {(currentUser?.이름 === selectedDoc.작성자 || isAdmin) && (
                     <div className="flex gap-2">
                         <button onClick={openEditModal} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="문서 수정"><Edit2 size={20}/></button>

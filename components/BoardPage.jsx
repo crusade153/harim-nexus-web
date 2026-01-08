@@ -2,20 +2,18 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { X, Image as ImageIcon, Search, MessageSquare, Trash2, Edit2 } from 'lucide-react'
-import { createPost, createComment, deletePost, updatePost, deleteComment } from '@/lib/sheets' // ✅ 수정/삭제 함수 추가
+import { createPost, createComment, deletePost, updatePost, deleteComment } from '@/lib/sheets'
 
 export default function BoardPage({ posts, currentUser, onRefresh }) {
   const [filter, setFilter] = useState('전체')
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false)
   const [selectedPost, setSelectedPost] = useState(null)
   
-  // 수정 모드인지 확인
   const [isEditMode, setIsEditMode] = useState(false) 
   
   const [newPost, setNewPost] = useState({ 제목: '', 태그: '일반', 내용: '', 첨부파일: null })
   const [commentInput, setCommentInput] = useState('')
 
-  // 관리자 권한 확인 (유경덕 ID 확인)
   const isAdmin = currentUser?.아이디 === 'crusade153'
 
   useEffect(() => {
@@ -44,18 +42,15 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     if (file) { setNewPost({ ...newPost, 첨부파일: file.name }) }
   }
 
-  // ✅ 글 저장 or 수정 핸들러
   const handleSave = async () => {
     if (!newPost.제목.trim()) { toast.error('제목 입력!'); return }
     if (!newPost.내용.trim()) { toast.error('내용 입력!'); return }
 
     try {
       if (isEditMode && selectedPost) {
-        // 수정 모드
-        await updatePost(selectedPost.ID, newPost)
+        await updatePost(selectedPost.ID, newPost, currentUser?.이름)
         toast.success('게시글이 수정되었습니다!')
       } else {
-        // 새 글 작성
         await createPost({ ...newPost, 작성자명: currentUser?.이름 || '익명' })
         toast.success('게시글 등록 완료!')
       }
@@ -69,11 +64,12 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     }
   }
 
-  // ✅ 글 삭제 핸들러
+  // ✅ [수정] 삭제 시 userName 전달
   const handleDeletePost = async () => {
     if (!confirm('정말 이 게시글을 삭제하시겠습니까?')) return
     try {
-      await deletePost(selectedPost.ID)
+      // ✅ currentUser.이름 전달
+      await deletePost(selectedPost.ID, currentUser?.이름)
       toast.success('게시글이 삭제되었습니다.')
       setSelectedPost(null)
       if (onRefresh) onRefresh()
@@ -82,7 +78,6 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     }
   }
 
-  // ✅ 수정 버튼 클릭 시 모달 열기
   const openEditModal = () => {
     setNewPost({
       제목: selectedPost.제목,
@@ -110,7 +105,6 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     }
   }
 
-  // ✅ 댓글 삭제 핸들러
   const handleDeleteComment = async (commentId) => {
     if(!confirm('댓글을 삭제하시겠습니까?')) return
     try {
@@ -177,7 +171,6 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white leading-snug">{selectedPost.제목}</h2>
               </div>
               <div className="flex items-center gap-2">
-                {/* ✅ 수정/삭제 버튼: 본인이거나 관리자일 때만 표시 */}
                 {(currentUser?.이름 === selectedPost.작성자명 || isAdmin) && (
                   <>
                     <button onClick={openEditModal} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 size={18}/></button>
@@ -201,7 +194,6 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
                         <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl rounded-tl-none relative group-hover:bg-slate-100 dark:group-hover:bg-slate-800 transition-colors">
                           <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cmt.작성자}</span><span className="text-[10px] text-slate-400">{cmt.시간}</span></div>
-                            {/* 댓글 삭제 버튼: 본인 또는 관리자 */}
                             {(currentUser?.이름 === cmt.작성자 || isAdmin) && (
                               <button onClick={() => handleDeleteComment(cmt.ID)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><X size={12}/></button>
                             )}
