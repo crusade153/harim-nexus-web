@@ -5,7 +5,7 @@ import "gantt-task-react/dist/index.css"
 import { updateTaskTimeline } from '@/lib/sheets'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
-import { ko } from 'date-fns/locale' // ✅ 한국어 로케일 추가
+import { ko } from 'date-fns/locale' // ✅ 한국어 로케일
 
 // ✅ 커스텀 리스트 헤더 컴포넌트 (컬럼 정의)
 const TaskListHeader = ({ headerHeight }) => {
@@ -44,12 +44,12 @@ const TaskListTable = ({ tasks, rowHeight, onExpanderClick }) => {
              {t.name}
           </div>
           <div className="w-[100px] px-2 text-xs text-slate-500 dark:text-slate-400 text-center border-l border-slate-100 dark:border-slate-800">
-            {/* ✅ 날짜 포맷 수정: 06(화) 형태 */}
-            {format(t.start, 'dd(E)', { locale: ko })}
+            {/* ✅ [수정됨] 날짜 포맷: 1/5 (월) 형태 */}
+            {format(t.start, 'M/d (E)', { locale: ko })}
           </div>
           <div className="w-[100px] px-2 text-xs text-slate-500 dark:text-slate-400 text-center border-l border-slate-100 dark:border-slate-800">
-            {/* ✅ 날짜 포맷 수정: 06(화) 형태 */}
-            {format(t.end, 'dd(E)', { locale: ko })}
+            {/* ✅ [수정됨] 날짜 포맷: 1/6 (화) 형태 */}
+            {format(t.end, 'M/d (E)', { locale: ko })}
           </div>
           <div className="w-[80px] px-2 flex justify-center border-l border-slate-100 dark:border-slate-800">
              <span className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300 font-medium truncate max-w-full">
