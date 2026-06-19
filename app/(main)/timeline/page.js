@@ -4,8 +4,46 @@ import CompactTimeline from '@/components/CompactTimeline'
 import WeeklyBoard from '@/components/WeeklyBoard'
 import Skeleton from '@/components/Skeleton'
 import { getRealData, getProjectTasks, createTask, updateTask, deleteProject, createProject, updateProject, deleteTask, toggleTaskStatus } from '@/lib/sheets'
-import { Plus, Folder, Calendar, Edit2, Trash2, X, Save, Clock, LayoutGrid, BarChart3, ChevronDown } from 'lucide-react'
+import { Plus, Folder, Calendar, Edit2, Trash2, X, Save, Clock, LayoutGrid, BarChart3, ChevronDown, UserRound } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function toLocalDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function parseProjectPeriod(period, createdAt) {
+  const matches = [...String(period || '').matchAll(/(\d{4})\s*[.\-/년]\s*(\d{1,2})(?:\s*[.\-/월]\s*(\d{1,2}))?/g)]
+  if (matches.length === 0) return null
+
+  const toDate = (match, isEnd) => {
+    const year = Number(match[1])
+    const month = Number(match[2]) - 1
+    const hasDay = Boolean(match[3])
+    const day = hasDay ? Number(match[3]) : (isEnd ? new Date(year, month + 1, 0).getDate() : 1)
+    const date = new Date(year, month, day)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
+  const end = toDate(matches[matches.length - 1], true)
+  const start = matches.length > 1
+    ? toDate(matches[0], false)
+    : (createdAt ? toLocalDay(new Date(createdAt)) : null)
+
+  if (!start || !end || Number.isNaN(start.getTime()) || end < start) return null
+
+  const today = toLocalDay(new Date())
+  const totalDays = Math.max(1, Math.round((end - start) / DAY_MS) + 1)
+  const elapsedDays = Math.max(0, Math.min(totalDays, Math.round((today - start) / DAY_MS) + 1))
+  const progress = Math.round((elapsedDays / totalDays) * 100)
+  const remainingDays = Math.max(0, Math.ceil((end - today) / DAY_MS))
+
+  return {
+    progress,
+    remainingLabel: today < start ? '시작 전' : today > end ? '기간 종료' : `D-${remainingDays}`,
+  }
+}
 
 export default function TimelinePage() {
   const [projects, setProjects] = useState([])
@@ -236,6 +274,38 @@ export default function TimelinePage() {
           </div>
         )}
         <span className="text-xs text-slate-400 ml-1">{projects.length}개 프로젝트</span>
+        {(() => {
+          const project = projects.find(p => p.ID === selectedProjectId)
+          if (!project) return null
+          const schedule = parseProjectPeriod(project.기간, project.생성일)
+
+          return (
+            <div className="flex flex-1 flex-wrap items-center gap-x-4 gap-y-2 md:ml-3 md:border-l md:border-slate-200 md:pl-4 dark:md:border-slate-700">
+              <span className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                <Calendar size={14} className="text-indigo-500" />
+                <b className="text-slate-500 dark:text-slate-400">기간</b>
+                {project.기간 || '미입력'}
+              </span>
+              <span className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                <UserRound size={14} className="text-indigo-500" />
+                <b className="text-slate-500 dark:text-slate-400">작성자</b>
+                {project.작성자 || '미지정'}
+              </span>
+              {schedule ? (
+                <div className="flex min-w-[190px] flex-1 items-center gap-2 md:max-w-[300px]">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" title={`기간 진척률 ${schedule.progress}%`}>
+                    <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${schedule.progress}%` }} />
+                  </div>
+                  <span className="whitespace-nowrap text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                    {schedule.progress}% · {schedule.remainingLabel}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-xs text-slate-400">기간 진척률 산정 불가</span>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* 보고 머리말: 문제점 → 개선방향 → 개선목표 */}
