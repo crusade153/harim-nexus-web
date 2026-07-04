@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import CompactTimeline from '@/components/CompactTimeline'
 import WeeklyBoard from '@/components/WeeklyBoard'
 import Skeleton from '@/components/Skeleton'
@@ -61,7 +61,7 @@ export default function TimelinePage() {
   const [editingTask, setEditingTask] = useState(null)
   const [editingProject, setEditingProject] = useState(null)
 
-  const [taskForm, setTaskForm] = useState({ 제목: '', 담당자: '', 시작일: '', 마감일: '', 내용: '', 우선순위: '보통', 프로젝트ID: '' })
+  const [taskForm, setTaskForm] = useState({ 제목: '', 담당자: '', 시작일: '', 마감일: '', 내용: '', 우선순위: '보통', 프로젝트ID: '', 상위업무ID: '' })
   const [projectForm, setProjectForm] = useState({ 제목: '', 기간: '', 문제점: '', 개선방향: '', 개선목표: '' })
 
   const loadProjects = async () => {
@@ -125,7 +125,8 @@ export default function TimelinePage() {
     } catch (e) { toast.error('삭제 실패 (DB 오류)') }
   }
 
-  const handleOpenTaskModal = (task = null) => {
+  // parentTask: 간트 행의 '하위 업무 추가' 버튼으로 열릴 때 상위 업무를 미리 지정
+  const handleOpenTaskModal = (task = null, parentTask = null) => {
     if (task) {
       setEditingTask(task)
       setTaskForm({
@@ -135,12 +136,17 @@ export default function TimelinePage() {
         마감일: task.due_date ? task.due_date.split('T')[0] : new Date().toISOString().split('T')[0],
         내용: task.content || '',
         우선순위: task.priority || '보통',
-        프로젝트ID: String(task.project_id || selectedProjectId || projects[0]?.ID || '')
+        프로젝트ID: String(task.project_id || selectedProjectId || projects[0]?.ID || ''),
+        상위업무ID: task.parent_id ? String(task.parent_id) : ''
       })
     } else {
       const today = new Date().toISOString().split('T')[0]
       setEditingTask(null)
-      setTaskForm({ 제목: '', 담당자: currentUser?.이름, 시작일: today, 마감일: today, 내용: '', 우선순위: '보통', 프로젝트ID: String(selectedProjectId || projects[0]?.ID || '') })
+      setTaskForm({
+        제목: '', 담당자: currentUser?.이름, 시작일: today, 마감일: today, 내용: '', 우선순위: '보통',
+        프로젝트ID: String(parentTask?.project_id || selectedProjectId || projects[0]?.ID || ''),
+        상위업무ID: parentTask ? String(parentTask.id) : ''
+      })
     }
     setIsTaskModalOpen(true)
   }
@@ -155,7 +161,8 @@ export default function TimelinePage() {
       마감일: t.마감일 ? String(t.마감일).split('T')[0] : new Date().toISOString().split('T')[0],
       내용: t.내용 || '',
       우선순위: t.우선순위 || '보통',
-      프로젝트ID: String(t.프로젝트ID || '')
+      프로젝트ID: String(t.프로젝트ID || ''),
+      상위업무ID: t.상위업무ID ? String(t.상위업무ID) : ''
     })
     setIsTaskModalOpen(true)
   }
@@ -183,7 +190,8 @@ export default function TimelinePage() {
         마감일: taskForm.마감일,
         내용: taskForm.내용,
         우선순위: taskForm.우선순위,
-        프로젝트ID: projectId
+        프로젝트ID: projectId,
+        상위업무ID: taskForm.상위업무ID || null
       }
 
       if (editingTask) {
@@ -201,7 +209,11 @@ export default function TimelinePage() {
 
   const handleDeleteTask = async () => {
     if (!editingTask) return
-    if (!confirm('정말 삭제하시겠습니까?')) return
+    const editingId = String(editingTask.id || editingTask.ID)
+    const children = allTasks.filter(t => String(t.상위업무ID) === editingId)
+    const grandChildren = allTasks.filter(t => children.some(c => String(c.ID) === String(t.상위업무ID)))
+    const subCount = children.length + grandChildren.length
+    if (!confirm(subCount > 0 ? `연결된 하위 업무 ${subCount}건도 함께 삭제됩니다. 정말 삭제하시겠습니까?` : '정말 삭제하시겠습니까?')) return
     try {
         // ✅ [수정] 삭제 시 사용자 이름 전달
         await deleteTask(editingTask.id || editingTask.ID, currentUser?.이름)
@@ -216,6 +228,45 @@ export default function TimelinePage() {
     const originalTask = tasks.find(t => String(t.id) === task.id)
     if (originalTask) handleOpenTaskModal(originalTask)
   }
+
+  // '상위 업무' 드롭다운 후보: 같은 프로젝트의 업무를 트리 순서로 나열.
+  // 하위 업무는 최대 2단계까지만 허용 → (후보의 깊이 + 1 + 수정 중인 업무의 하위 트리 높이) ≤ 2
+  const parentOptions = useMemo(() => {
+    const pid = String(taskForm.프로젝트ID || '')
+    if (!pid) return []
+    const inProject = allTasks.filter(t => String(t.프로젝트ID) === pid)
+    const ids = new Set(inProject.map(t => String(t.ID)))
+    const childrenOf = new Map()
+    const roots = []
+    inProject.forEach(t => {
+      const p = t.상위업무ID && ids.has(String(t.상위업무ID)) ? String(t.상위업무ID) : null
+      if (p) {
+        if (!childrenOf.has(p)) childrenOf.set(p, [])
+        childrenOf.get(p).push(t)
+      } else roots.push(t)
+    })
+
+    const editingId = editingTask ? String(editingTask.id || editingTask.ID) : null
+    let subtreeHeight = 0
+    if (editingId) {
+      const kids = childrenOf.get(editingId) || []
+      if (kids.length > 0) {
+        subtreeHeight = kids.some(k => (childrenOf.get(String(k.ID)) || []).length > 0) ? 2 : 1
+      }
+    }
+
+    const out = []
+    const walk = (list, depth, insideEditing) => {
+      list.forEach(t => {
+        const isSelf = String(t.ID) === editingId
+        if (!isSelf && !insideEditing && depth + 1 + subtreeHeight <= 2) out.push({ ...t, depth })
+        const kids = childrenOf.get(String(t.ID)) || []
+        if (kids.length > 0 && depth < 2) walk(kids, depth + 1, insideEditing || isSelf)
+      })
+    }
+    walk(roots, 0, false)
+    return out
+  }, [allTasks, taskForm.프로젝트ID, editingTask])
 
   if (loading) return <Skeleton />
 
@@ -360,6 +411,7 @@ export default function TimelinePage() {
                  tasks={tasks}
                  onTaskClick={handleOpenTaskModal}
                  onToggleComplete={handleToggleComplete}
+                 onAddSubtask={(parentTask) => handleOpenTaskModal(null, parentTask)}
                />
             </div>
           </>
@@ -439,10 +491,21 @@ export default function TimelinePage() {
 
               <div>
                 <label className="label-text">프로젝트</label>
-                <select className="w-full input-field" value={taskForm.프로젝트ID} onChange={e => setTaskForm({...taskForm, 프로젝트ID: e.target.value})}>
+                <select className="w-full input-field" value={taskForm.프로젝트ID} onChange={e => setTaskForm({...taskForm, 프로젝트ID: e.target.value, 상위업무ID: ''})}>
                   <option value="">프로젝트 선택...</option>
                   {projects.map(p => <option key={p.ID} value={p.ID}>{p.제목}</option>)}
                 </select>
+              </div>
+
+              <div>
+                <label className="label-text">상위 업무 (선택)</label>
+                <select className="w-full input-field" value={taskForm.상위업무ID} onChange={e => setTaskForm({...taskForm, 상위업무ID: e.target.value})}>
+                  <option value="">없음 — 최상위 업무</option>
+                  {parentOptions.map(t => (
+                    <option key={t.ID} value={t.ID}>{'   '.repeat(t.depth)}{t.depth > 0 ? '└ ' : ''}{t.제목}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">상위 업무를 선택하면 WBS에서 그 아래에 연결되어 표시됩니다. (하위 업무는 최대 2단계)</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

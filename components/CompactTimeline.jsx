@@ -6,7 +6,7 @@ import {
   startOfWeek, endOfWeek, eachWeekOfInterval, eachDayOfInterval,
 } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { CheckCircle2, Circle, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, Circle, AlertTriangle, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 
 // 상태별 색상
 const C = {
@@ -16,7 +16,7 @@ const C = {
   upcoming: { bg: '#F1F5F9', br: '#94A3B8', tx: '#475569' },
 }
 
-const LEFT = '210px'
+const LEFT = '240px'
 
 function parseDate(v) {
   if (!v) return null
@@ -26,12 +26,22 @@ function parseDate(v) {
   return new Date(y, m - 1, d)
 }
 
-export default function CompactTimeline({ tasks = [], onTaskClick, onToggleComplete }) {
+export default function CompactTimeline({ tasks = [], onTaskClick, onToggleComplete, onAddSubtask }) {
   const [scale, setScale] = useState('month') // 'day' | 'week' | 'month'
+  const [collapsed, setCollapsed] = useState(() => new Set()) // 접힌 상위 업무 id
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
 
+  const toggleCollapse = (id) => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  // 상위-하위(최대 2단계) 트리로 정렬: 상위 업무 아래에 하위 업무가 들여쓰기로 이어짐
   const rows = useMemo(() => {
-    return tasks.map(t => {
+    const items = tasks.map(t => {
       const s = parseDate(t.start_date || t.created_at)
       const e = parseDate(t.due_date || t.start_date || t.created_at)
       if (!s || !e) return null
@@ -40,9 +50,31 @@ export default function CompactTimeline({ tasks = [], onTaskClick, onToggleCompl
       const done = t.status === '완료'
       const overdue = !done && end < today
       const active = !done && start <= today && today <= end
-      return { raw: t, id: t.id, name: t.title, assignee: t.assignee, start, end, done, overdue, active }
-    }).filter(Boolean).sort((a, b) => a.start - b.start || a.end - b.end)
-  }, [tasks, today])
+      return { raw: t, id: String(t.id), parentId: t.parent_id ? String(t.parent_id) : null, name: t.title, assignee: t.assignee, start, end, done, overdue, active }
+    }).filter(Boolean)
+
+    const ids = new Set(items.map(i => i.id))
+    const childrenOf = new Map()
+    const roots = []
+    items.forEach(i => {
+      if (i.parentId && ids.has(i.parentId)) {
+        if (!childrenOf.has(i.parentId)) childrenOf.set(i.parentId, [])
+        childrenOf.get(i.parentId).push(i)
+      } else roots.push(i)
+    })
+
+    const byStart = (a, b) => a.start - b.start || a.end - b.end
+    const flat = []
+    const walk = (list, depth) => {
+      list.sort(byStart).forEach(i => {
+        const kids = childrenOf.get(i.id) || []
+        flat.push({ ...i, depth, childCount: kids.length, childDone: kids.filter(k => k.done).length })
+        if (kids.length > 0 && !collapsed.has(i.id)) walk(kids, depth + 1)
+      })
+    }
+    walk(roots, 0)
+    return flat
+  }, [tasks, today, collapsed])
 
   const { rangeStart, rangeEnd, totalDays } = useMemo(() => {
     if (rows.length === 0) {
@@ -117,7 +149,7 @@ export default function CompactTimeline({ tasks = [], onTaskClick, onToggleCompl
   return (
     <div className="w-full overflow-hidden">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-bold text-slate-400">업무 {rows.length}건</span>
+        <span className="text-xs font-bold text-slate-400">업무 {tasks.length}건</span>
         <ScaleSwitcher />
       </div>
 
@@ -141,19 +173,36 @@ export default function CompactTimeline({ tasks = [], onTaskClick, onToggleCompl
             const left = Math.max(0, pct(r.start))
             const width = Math.max(1.2, pct(r.end) + dayW - left)
             return (
-              <div key={r.id} className="grid border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50/60 dark:hover:bg-slate-700/20" style={{ gridTemplateColumns: `${LEFT} minmax(0, 1fr)` }}>
-                {/* 좌측: 체크 + 정보 */}
-                <div className="px-3 py-2 flex items-center gap-2 overflow-hidden">
+              <div key={r.id} className="grid border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50/60 dark:hover:bg-slate-700/20 group" style={{ gridTemplateColumns: `${LEFT} minmax(0, 1fr)` }}>
+                {/* 좌측: 트리(들여쓰기·접기) + 체크 + 정보 */}
+                <div className="py-2 pr-2 flex items-center gap-1.5 overflow-hidden" style={{ paddingLeft: `${12 + r.depth * 16}px` }}>
+                  {r.depth > 0 && <span className="shrink-0 text-slate-300 dark:text-slate-600 text-[11px] leading-none select-none">└</span>}
+                  {r.childCount > 0 ? (
+                    <button onClick={() => toggleCollapse(r.id)} title={collapsed.has(r.id) ? '하위 업무 펼치기' : '하위 업무 접기'} className="shrink-0 text-slate-400 hover:text-indigo-500">
+                      {collapsed.has(r.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  ) : (
+                    <span className="w-[14px] shrink-0" />
+                  )}
                   <button onClick={() => onToggleComplete && onToggleComplete(r.id, r.done)} title={r.done ? '완료 취소' : '완료 처리'} className="shrink-0">
                     {r.done ? <CheckCircle2 size={18} className="text-green-500" /> : <Circle size={18} className="text-slate-300 dark:text-slate-600 hover:text-indigo-400" />}
                   </button>
-                  <div className="min-w-0 cursor-pointer" onClick={() => onTaskClick && onTaskClick(r.raw)}>
-                    <div className={`text-[13px] font-bold truncate flex items-center gap-1 ${r.done ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                  <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onTaskClick && onTaskClick(r.raw)}>
+                    <div className={`text-[13px] truncate flex items-center gap-1 ${r.depth === 0 ? 'font-bold' : 'font-medium'} ${r.done ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}>
                       {r.overdue && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
                       {r.name}
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate">{r.assignee || '미정'} · {format(r.start, 'M/d')}~{format(r.end, 'M/d')}</div>
+                    <div className="text-[10px] text-slate-400 truncate">
+                      {r.assignee || '미정'} · {format(r.start, 'M/d')}~{format(r.end, 'M/d')}
+                      {r.childCount > 0 && <span className="ml-1 text-indigo-400 font-bold">하위 {r.childDone}/{r.childCount}</span>}
+                    </div>
                   </div>
+                  {onAddSubtask && r.depth < 2 && (
+                    <button onClick={() => onAddSubtask(r.raw)} title="하위 업무 추가"
+                      className="shrink-0 p-1 rounded-md text-slate-300 dark:text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Plus size={14} />
+                    </button>
+                  )}
                 </div>
                 {/* 우측: 타임라인 트랙 */}
                 <div className="relative overflow-hidden min-h-[40px]">
@@ -165,8 +214,8 @@ export default function CompactTimeline({ tasks = [], onTaskClick, onToggleCompl
                     return (
                       <>
                         <button onClick={() => onTaskClick && onTaskClick(r.raw)} title={r.name}
-                          className="absolute top-1/2 -translate-y-1/2 h-6 rounded-md flex items-center px-2 overflow-hidden transition-all hover:brightness-95"
-                          style={{ left: `${left}%`, width: `${width}%`, background: c.bg, borderLeft: `3px solid ${c.br}` }}>
+                          className="absolute top-1/2 -translate-y-1/2 rounded-md flex items-center px-2 overflow-hidden transition-all hover:brightness-95"
+                          style={{ left: `${left}%`, width: `${width}%`, height: r.depth === 0 ? '24px' : '18px', background: c.bg, borderLeft: `3px solid ${c.br}`, opacity: r.depth > 0 ? 0.92 : 1 }}>
                           {inside && <span className={`text-[11px] font-bold truncate ${r.done ? 'line-through' : ''}`} style={{ color: c.tx }}>{r.name}</span>}
                         </button>
                         {!inside && (

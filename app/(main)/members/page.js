@@ -21,11 +21,12 @@ export default function MembersRoutePage() {
   if (loading || !data) return <Skeleton />
 
   return (
-    <MembersPage 
-      members={data.members} 
-      tasks={data.tasks} 
-      projects={data.projects} 
-      onRefresh={loadData} 
+    <MembersPage
+      members={data.members}
+      tasks={data.tasks}
+      projects={data.projects}
+      currentUser={data.currentUser}
+      onRefresh={loadData}
     />
   )
 }

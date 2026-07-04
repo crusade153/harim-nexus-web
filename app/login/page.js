@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
-import Link from 'next/link'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -104,11 +103,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-slate-500">
-          아직 계정이 없으신가요?{' '}
-          <Link href="/signup" className="text-indigo-600 font-bold hover:underline">
-            회원가입 신청
-          </Link>
+        <div className="mt-6 text-center text-xs text-slate-400">
+          계정이 필요하신가요? 팀장에게 가입을 요청하세요.
         </div>
       </div>
     </div>

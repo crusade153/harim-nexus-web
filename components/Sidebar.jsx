@@ -13,7 +13,8 @@ import {
   X, 
   LogOut, 
   Megaphone,
-  GanttChartSquare 
+  GanttChartSquare,
+  FileBarChart2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
@@ -35,7 +36,13 @@ export default function Sidebar() {
     { id: 'archive', name: '팀 아카이브', icon: Archive, path: '/archive' }, 
     { id: 'calendar', name: '캘린더', icon: CalendarDays, path: '/calendar' },
     { id: 'members', name: '팀원 관리', icon: Users, path: '/members' },
+    // 팀장(관리자) 전용: 경영진 보고 리포트
+    { id: 'report', name: '경영진 보고', icon: FileBarChart2, badge: 'Admin', path: '/report', adminOnly: true },
   ]
+
+  const SYS_ADMIN_ID = 'crusade153'
+  const isAdmin = myProfile.loginId === SYS_ADMIN_ID
+  const visibleMenuItems = menuItems.filter(item => !item.adminOnly || isAdmin)
 
   useEffect(() => {
     let channel = null;
@@ -115,7 +122,7 @@ export default function Sidebar() {
 
         <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
           <p className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Menu</p>
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const isActive = pathname === item.path
             const Icon = item.icon
             return (
