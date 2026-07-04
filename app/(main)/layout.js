@@ -10,7 +10,7 @@ export default function MainLayout({ children }) {
         <Suspense fallback={<div className="h-16 bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700" />}>
           <Header />
         </Suspense>
-        <div className="flex-1 p-6 lg:p-8 max-w-[1920px] mx-auto w-full">
+        <div className="flex-1 p-4 lg:p-8 max-w-[1920px] mx-auto w-full">
           {children}
         </div>
       </main>

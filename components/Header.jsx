@@ -56,7 +56,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 h-16 px-6 lg:px-8 transition-colors duration-200">
+      <header className="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 h-16 pl-16 pr-4 lg:px-8 transition-colors duration-200">
         <div className="flex items-center justify-between h-full max-w-[1600px] mx-auto">
           
           <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">

@@ -1,12 +1,13 @@
 'use client'
 import { useState, useMemo } from 'react'
 import {
-  startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, differenceInCalendarDays
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, differenceInCalendarDays,
+  addWeeks, addMonths
 } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import {
   FileBarChart2, Printer, Users, CheckCircle2, Clock, AlertTriangle,
-  FolderKanban, Calendar, TrendingUp
+  FolderKanban, Calendar, TrendingUp, ChevronLeft, ChevronRight
 } from 'lucide-react'
 
 function parseDate(v) {
@@ -19,18 +20,24 @@ function parseDate(v) {
 
 export default function ExecutiveReport({ data }) {
   const [period, setPeriod] = useState('weekly') // 'weekly' | 'monthly'
+  const [offset, setOffset] = useState(0) // 0 = 이번 주/달, -1 = 지난 주/달 ...
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
 
-  const { start, end, label } = useMemo(() => {
+  // 기간 종류 변경 시 이번 주/달로 초기화
+  const changePeriod = (p) => { setPeriod(p); setOffset(0) }
+
+  const { start, end, label, isCurrent } = useMemo(() => {
     if (period === 'weekly') {
-      const s = startOfWeek(today, { weekStartsOn: 1 })
-      const e = endOfWeek(today, { weekStartsOn: 1 })
-      return { start: s, end: e, label: `${format(s, 'M.d', { locale: ko })} ~ ${format(e, 'M.d', { locale: ko })}` }
+      const base = addWeeks(today, offset)
+      const s = startOfWeek(base, { weekStartsOn: 1 })
+      const e = endOfWeek(base, { weekStartsOn: 1 })
+      return { start: s, end: e, label: `${format(s, 'yyyy.M.d', { locale: ko })} ~ ${format(e, 'M.d', { locale: ko })}`, isCurrent: offset === 0 }
     }
-    const s = startOfMonth(today), e = endOfMonth(today)
-    return { start: s, end: e, label: format(today, 'yyyy년 M월', { locale: ko }) }
-  }, [period, today])
+    const base = addMonths(today, offset)
+    const s = startOfMonth(base), e = endOfMonth(base)
+    return { start: s, end: e, label: format(base, 'yyyy년 M월', { locale: ko }), isCurrent: offset === 0 }
+  }, [period, offset, today])
 
   const report = useMemo(() => {
     const tasks = data?.tasks || []
@@ -108,27 +115,34 @@ export default function ExecutiveReport({ data }) {
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">관리자 전용 · 사장님 보고용 요약 (주간/월간)</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 주간/월간 종류 */}
           <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden text-xs font-bold">
-            <button onClick={() => setPeriod('weekly')} className={`px-4 py-2 ${period === 'weekly' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>주간</button>
-            <button onClick={() => setPeriod('monthly')} className={`px-4 py-2 ${period === 'monthly' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>월간</button>
+            <button onClick={() => changePeriod('weekly')} className={`px-4 py-2 ${period === 'weekly' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>주간</button>
+            <button onClick={() => changePeriod('monthly')} className={`px-4 py-2 ${period === 'monthly' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>월간</button>
           </div>
-          <button onClick={() => window.print()} className="btn-primary text-xs py-2 px-3"><Printer size={15} /> 인쇄 / PDF 저장</button>
+          {/* 이전/다음 기간 이동 */}
+          <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+            <button onClick={() => setOffset(o => o - 1)} title="이전" className="p-2 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700"><ChevronLeft size={16} /></button>
+            <button onClick={() => setOffset(0)} className={`px-3 py-2 text-xs font-bold border-x border-slate-200 dark:border-slate-700 whitespace-nowrap ${isCurrent ? 'text-indigo-600' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{period === 'weekly' ? '이번 주' : '이번 달'}</button>
+            <button onClick={() => setOffset(o => o + 1)} title="다음" className="p-2 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700"><ChevronRight size={16} /></button>
+          </div>
+          <button onClick={() => window.print()} className="btn-primary text-xs py-2 px-3"><Printer size={15} /> 인쇄 / PDF</button>
         </div>
       </div>
 
       {/* 리포트 본문 (인쇄 대상) */}
-      <div className="report-sheet bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-8 print:shadow-none print:border-0">
+      <div className="report-sheet bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 md:p-8 print:shadow-none print:border-0">
         {/* 리포트 헤더 */}
-        <div className="flex items-start justify-between border-b-2 border-slate-800 dark:border-slate-200 pb-4 mb-6">
-          <div>
+        <div className="flex items-start justify-between gap-3 border-b-2 border-slate-800 dark:border-slate-200 pb-4 mb-6">
+          <div className="min-w-0">
             <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-1">Harim Foods · 원가팀</p>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{period === 'weekly' ? '주간' : '월간'} 업무 · 인원 현황 보고</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
-              <Calendar size={14} /> 보고 기간: <b className="text-slate-700 dark:text-slate-200">{label}</b>
+            <h2 className="text-lg md:text-2xl font-bold text-slate-900 dark:text-white">{period === 'weekly' ? '주간' : '월간'} 업무 · 인원 현황 보고</h2>
+            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+              <Calendar size={14} className="shrink-0" /> 보고 기간: <b className="text-slate-700 dark:text-slate-200">{label}</b>
             </p>
           </div>
-          <div className="text-right text-xs text-slate-400">
+          <div className="text-right text-[11px] md:text-xs text-slate-400 shrink-0">
             <p>작성일 {format(today, 'yyyy.MM.dd', { locale: ko })}</p>
             <p className="mt-1">작성자 {data?.currentUser?.이름 || '팀장'}</p>
           </div>
@@ -156,8 +170,8 @@ export default function ExecutiveReport({ data }) {
         {/* 2. 프로젝트 진행 현황 */}
         <section className="mb-7">
           <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-1.5"><FolderKanban size={16} className="text-indigo-500" /> 2. 프로젝트 진행 현황</h3>
-          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <table className="w-full min-w-[440px] text-sm">
               <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] uppercase text-slate-400">
                 <tr>
                   <th className="text-left font-bold px-3 py-2">프로젝트</th>
@@ -200,8 +214,8 @@ export default function ExecutiveReport({ data }) {
               ))}
             </div>
           </div>
-          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <table className="w-full min-w-[520px] text-sm">
               <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] uppercase text-slate-400">
                 <tr>
                   <th className="text-left font-bold px-3 py-2">담당자</th>
