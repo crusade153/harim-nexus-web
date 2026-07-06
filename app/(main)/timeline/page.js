@@ -8,6 +8,7 @@ import { Plus, Folder, Calendar, Edit2, Trash2, X, Save, Clock, LayoutGrid, BarC
 import toast from 'react-hot-toast'
 
 const DAY_MS = 24 * 60 * 60 * 1000
+const MAX_WBS_DEPTH = 3
 
 function toLocalDay(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -127,6 +128,15 @@ export default function TimelinePage() {
 
   // parentTask: 간트 행의 '하위 업무 추가' 버튼으로 열릴 때 상위 업무를 미리 지정
   const handleOpenTaskModal = (task = null, parentTask = null) => {
+    if (!task && parentTask) {
+      const parentInfo = allTasks.find(t => String(t.ID) === String(parentTask.id))
+      const parentDepth = parentInfo ? wbsTree.byId.get(String(parentInfo.ID))?.depth : null
+      if (parentDepth !== null && parentDepth >= MAX_WBS_DEPTH) {
+        toast.error('레벨4 업무 아래에는 하위 TASK를 추가할 수 없습니다.')
+        return
+      }
+    }
+
     if (task) {
       setEditingTask(task)
       setTaskForm({
@@ -210,9 +220,18 @@ export default function TimelinePage() {
   const handleDeleteTask = async () => {
     if (!editingTask) return
     const editingId = String(editingTask.id || editingTask.ID)
-    const children = allTasks.filter(t => String(t.상위업무ID) === editingId)
-    const grandChildren = allTasks.filter(t => children.some(c => String(c.ID) === String(t.상위업무ID)))
-    const subCount = children.length + grandChildren.length
+    const childrenByParent = new Map()
+    allTasks.forEach(t => {
+      const parentId = t.상위업무ID ? String(t.상위업무ID) : null
+      if (!parentId) return
+      if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, [])
+      childrenByParent.get(parentId).push(t)
+    })
+    const collectChildren = (parentId) => {
+      const directChildren = childrenByParent.get(parentId) || []
+      return directChildren.flatMap(child => [child, ...collectChildren(String(child.ID))])
+    }
+    const subCount = collectChildren(editingId).length
     if (!confirm(subCount > 0 ? `연결된 하위 업무 ${subCount}건도 함께 삭제됩니다. 정말 삭제하시겠습니까?` : '정말 삭제하시겠습니까?')) return
     try {
         // ✅ [수정] 삭제 시 사용자 이름 전달
@@ -229,11 +248,9 @@ export default function TimelinePage() {
     if (originalTask) handleOpenTaskModal(originalTask)
   }
 
-  // '상위 업무' 드롭다운 후보: 같은 프로젝트의 업무를 트리 순서로 나열.
-  // 하위 업무는 최대 2단계까지만 허용 → (후보의 깊이 + 1 + 수정 중인 업무의 하위 트리 높이) ≤ 2
-  const parentOptions = useMemo(() => {
+  const wbsTree = useMemo(() => {
     const pid = String(taskForm.프로젝트ID || '')
-    if (!pid) return []
+    if (!pid) return { options: [], byId: new Map(), maxDepth: 0 }
     const inProject = allTasks.filter(t => String(t.프로젝트ID) === pid)
     const ids = new Set(inProject.map(t => String(t.ID)))
     const childrenOf = new Map()
@@ -247,26 +264,34 @@ export default function TimelinePage() {
     })
 
     const editingId = editingTask ? String(editingTask.id || editingTask.ID) : null
-    let subtreeHeight = 0
-    if (editingId) {
-      const kids = childrenOf.get(editingId) || []
-      if (kids.length > 0) {
-        subtreeHeight = kids.some(k => (childrenOf.get(String(k.ID)) || []).length > 0) ? 2 : 1
-      }
+    const getSubtreeHeight = (taskId) => {
+      const kids = childrenOf.get(taskId) || []
+      if (kids.length === 0) return 0
+      return 1 + Math.max(...kids.map(k => getSubtreeHeight(String(k.ID))))
     }
+    const subtreeHeight = editingId ? getSubtreeHeight(editingId) : 0
 
     const out = []
+    const byId = new Map()
+    let maxDepth = 0
     const walk = (list, depth, insideEditing) => {
       list.forEach(t => {
         const isSelf = String(t.ID) === editingId
-        if (!isSelf && !insideEditing && depth + 1 + subtreeHeight <= 2) out.push({ ...t, depth })
+        maxDepth = Math.max(maxDepth, depth)
+        byId.set(String(t.ID), { ...t, depth })
+        if (!isSelf && !insideEditing && depth + 1 + subtreeHeight <= MAX_WBS_DEPTH) out.push({ ...t, depth })
         const kids = childrenOf.get(String(t.ID)) || []
-        if (kids.length > 0 && depth < 2) walk(kids, depth + 1, insideEditing || isSelf)
+        if (kids.length > 0) walk(kids, depth + 1, insideEditing || isSelf)
       })
     }
     walk(roots, 0, false)
-    return out
+    return { options: out, byId, maxDepth }
   }, [allTasks, taskForm.프로젝트ID, editingTask])
+
+  const parentOptions = wbsTree.options
+  const selectedParent = taskForm.상위업무ID ? wbsTree.byId.get(String(taskForm.상위업무ID)) : null
+  const nextTaskLevel = selectedParent ? selectedParent.depth + 2 : 1
+  const canAddMoreBelow = nextTaskLevel < MAX_WBS_DEPTH + 1
 
   if (loading) return <Skeleton />
 
@@ -401,14 +426,20 @@ export default function TimelinePage() {
               <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 text-sm">
                   <Clock size={16} className="text-slate-400"/> 실행계획 (WBS) · 완료일자 · 담당자
               </span>
-              <p className="text-xs text-slate-400 hidden md:block">
-                ○ 클릭 = 완료 처리 · 막대 클릭 = 상세 수정
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-slate-400 hidden lg:block">
+                  메인 TASK부터 레벨4까지 확장 가능 · 행의 +로 바로 하위 TASK 추가
+                </p>
+                <button onClick={() => handleOpenTaskModal()} className="btn-secondary text-xs py-1.5 px-2.5">
+                  <Plus size={14}/> 메인 TASK 추가
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 p-4">
                <CompactTimeline
                  tasks={tasks}
+                 maxDepth={MAX_WBS_DEPTH}
                  onTaskClick={handleOpenTaskModal}
                  onToggleComplete={handleToggleComplete}
                  onAddSubtask={(parentTask) => handleOpenTaskModal(null, parentTask)}
@@ -498,14 +529,23 @@ export default function TimelinePage() {
               </div>
 
               <div>
-                <label className="label-text">상위 업무 (선택)</label>
+                <label className="label-text">상위 TASK (선택)</label>
                 <select className="w-full input-field" value={taskForm.상위업무ID} onChange={e => setTaskForm({...taskForm, 상위업무ID: e.target.value})}>
-                  <option value="">없음 — 최상위 업무</option>
+                  <option value="">없음 — 레벨1 메인 TASK</option>
                   {parentOptions.map(t => (
-                    <option key={t.ID} value={t.ID}>{'   '.repeat(t.depth)}{t.depth > 0 ? '└ ' : ''}{t.제목}</option>
+                    <option key={t.ID} value={t.ID}>{'   '.repeat(t.depth)}{t.depth > 0 ? '└ ' : ''}L{t.depth + 1} · {t.제목}</option>
                   ))}
                 </select>
-                <p className="text-[11px] text-slate-400 mt-1">상위 업무를 선택하면 WBS에서 그 아래에 연결되어 표시됩니다. (하위 업무는 최대 2단계)</p>
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                  <div className="font-bold text-slate-600 dark:text-slate-300">
+                    저장 위치: 레벨{nextTaskLevel} {nextTaskLevel === 1 ? '메인 TASK' : '하위 TASK'}
+                  </div>
+                  <div className="mt-0.5">
+                    {selectedParent
+                      ? `상위: ${selectedParent.제목} · ${canAddMoreBelow ? `저장 후 그 아래로 ${MAX_WBS_DEPTH + 1 - nextTaskLevel}단계 더 확장 가능` : '레벨4라 더 이상 하위 TASK를 만들 수 없음'}`
+                      : `메인 TASK로 등록됩니다. 하위 TASK는 최대 레벨${MAX_WBS_DEPTH + 1}까지 만들 수 있습니다.`}
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
