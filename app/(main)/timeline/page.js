@@ -3,12 +3,72 @@ import { useState, useEffect, useMemo } from 'react'
 import CompactTimeline from '@/components/CompactTimeline'
 import WeeklyBoard from '@/components/WeeklyBoard'
 import Skeleton from '@/components/Skeleton'
-import { getRealData, getProjectTasks, createTask, updateTask, deleteProject, createProject, updateProject, deleteTask, toggleTaskStatus } from '@/lib/sheets'
-import { Plus, Folder, Calendar, Edit2, Trash2, X, Save, Clock, LayoutGrid, BarChart3, ChevronDown, UserRound } from 'lucide-react'
+import { getRealData, getProjectTasks, createTask, updateTask, deleteProject, createProject, updateProject, deleteTask, toggleTaskStatus, createWbsOutlineTasks, bulkUpdateTasks } from '@/lib/sheets'
+import { Plus, Folder, Calendar, Edit2, Trash2, X, Save, Clock, LayoutGrid, BarChart3, ChevronDown, UserRound, ClipboardList, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MAX_WBS_DEPTH = 3
+const DEFAULT_WBS_TEMPLATE = `기획 | 담당자 | 2026-07-08 | 2026-07-10 | 높음 | 주요
+  요구사항 정리 | 담당자 | 2026-07-08 | 2026-07-08
+  화면 설계 | 담당자 | 2026-07-09 | 2026-07-10
+개발 | 담당자 | 2026-07-11 | 2026-07-20 | 보통 | 주요
+  데이터 구조 정의 | 담당자 | 2026-07-11 | 2026-07-12
+  WBS 화면 구현 | 담당자 | 2026-07-13 | 2026-07-18
+테스트 및 안정화 | 담당자 | 2026-07-21 | 2026-07-24`
+
+function emptyTaskForm(currentUser, selectedProjectId, projects, parentTask = null) {
+  const today = new Date().toISOString().split('T')[0]
+  return {
+    제목: '',
+    담당자: currentUser?.이름 || '',
+    시작일: today,
+    마감일: today,
+    내용: '',
+    우선순위: '보통',
+    프로젝트ID: String(parentTask?.project_id || selectedProjectId || projects[0]?.ID || ''),
+    상위업무ID: parentTask ? String(parentTask.id) : '',
+    주요업무: false,
+    완료기준: '',
+    산출물링크: '',
+    지연사유: '',
+    선행업무ID: ''
+  }
+}
+
+function parseWbsOutline(text) {
+  const lines = String(text || '').split(/\r?\n/)
+  const stack = []
+  const items = []
+
+  lines.forEach((line) => {
+    if (!line.trim()) return
+    const indent = (line.match(/^\s*/)?.[0] || '').replace(/\t/g, '  ').length
+    const depth = Math.min(MAX_WBS_DEPTH, Math.floor(indent / 2))
+    const parts = line.trim().split('|').map(v => v.trim())
+    const title = parts[0]
+    if (!title) return
+
+    while (stack.length > depth) stack.pop()
+    const parentIndex = stack.length ? stack[stack.length - 1] : null
+    const index = items.length
+    items.push({
+      index,
+      parentIndex,
+      title,
+      assignee: parts[1] || '',
+      startDate: parts[2] || '',
+      dueDate: parts[3] || parts[2] || '',
+      priority: parts[4] || '보통',
+      isKey: /주요|key/i.test(parts[5] || ''),
+      order: index
+    })
+    stack[depth] = index
+    stack.length = depth + 1
+  })
+
+  return items
+}
 
 function toLocalDay(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -62,8 +122,12 @@ export default function TimelinePage() {
   const [editingTask, setEditingTask] = useState(null)
   const [editingProject, setEditingProject] = useState(null)
 
-  const [taskForm, setTaskForm] = useState({ 제목: '', 담당자: '', 시작일: '', 마감일: '', 내용: '', 우선순위: '보통', 프로젝트ID: '', 상위업무ID: '' })
+  const [taskForm, setTaskForm] = useState(emptyTaskForm(null, null, []))
   const [projectForm, setProjectForm] = useState({ 제목: '', 기간: '', 문제점: '', 개선방향: '', 개선목표: '' })
+  const [showQuickInput, setShowQuickInput] = useState(false)
+  const [quickText, setQuickText] = useState('')
+  const [selectedTaskIds, setSelectedTaskIds] = useState([])
+  const [bulkForm, setBulkForm] = useState({ 담당자명: '', 시작일: '', 마감일: '', 우선순위: '', 상태: '', 주요업무: '' })
 
   const loadProjects = async () => {
     const data = await getRealData()
@@ -147,16 +211,16 @@ export default function TimelinePage() {
         내용: task.content || '',
         우선순위: task.priority || '보통',
         프로젝트ID: String(task.project_id || selectedProjectId || projects[0]?.ID || ''),
-        상위업무ID: task.parent_id ? String(task.parent_id) : ''
+        상위업무ID: task.parent_id ? String(task.parent_id) : '',
+        주요업무: Boolean(task.is_key_task),
+        완료기준: task.acceptance_criteria || '',
+        산출물링크: task.deliverable_url || '',
+        지연사유: task.delay_reason || '',
+        선행업무ID: task.predecessor_id ? String(task.predecessor_id) : ''
       })
     } else {
-      const today = new Date().toISOString().split('T')[0]
       setEditingTask(null)
-      setTaskForm({
-        제목: '', 담당자: currentUser?.이름, 시작일: today, 마감일: today, 내용: '', 우선순위: '보통',
-        프로젝트ID: String(parentTask?.project_id || selectedProjectId || projects[0]?.ID || ''),
-        상위업무ID: parentTask ? String(parentTask.id) : ''
-      })
+      setTaskForm(emptyTaskForm(currentUser, selectedProjectId, projects, parentTask))
     }
     setIsTaskModalOpen(true)
   }
@@ -172,7 +236,12 @@ export default function TimelinePage() {
       내용: t.내용 || '',
       우선순위: t.우선순위 || '보통',
       프로젝트ID: String(t.프로젝트ID || ''),
-      상위업무ID: t.상위업무ID ? String(t.상위업무ID) : ''
+      상위업무ID: t.상위업무ID ? String(t.상위업무ID) : '',
+      주요업무: Boolean(t.주요업무),
+      완료기준: t.완료기준 || '',
+      산출물링크: t.산출물링크 || '',
+      지연사유: t.지연사유 || '',
+      선행업무ID: t.선행업무ID ? String(t.선행업무ID) : ''
     })
     setIsTaskModalOpen(true)
   }
@@ -201,7 +270,12 @@ export default function TimelinePage() {
         내용: taskForm.내용,
         우선순위: taskForm.우선순위,
         프로젝트ID: projectId,
-        상위업무ID: taskForm.상위업무ID || null
+        상위업무ID: taskForm.상위업무ID || null,
+        주요업무: taskForm.주요업무,
+        완료기준: taskForm.완료기준,
+        산출물링크: taskForm.산출물링크,
+        지연사유: taskForm.지연사유,
+        선행업무ID: taskForm.선행업무ID || null
       }
 
       if (editingTask) {
@@ -215,6 +289,89 @@ export default function TimelinePage() {
       loadProjects()   // 주간 보드(전체 업무) 새로고침
       refreshTasks()   // 간트(선택 프로젝트) 새로고침
     } catch (e) { toast.error('저장 실패') }
+  }
+
+  const handleCreateOutline = async () => {
+    if (!selectedProjectId) return toast.error('프로젝트를 먼저 선택하세요.')
+    const items = parseWbsOutline(quickText)
+    if (items.length === 0) return toast.error('등록할 WBS 업무를 입력하세요.')
+
+    try {
+      await createWbsOutlineTasks(selectedProjectId, items, currentUser?.이름)
+      toast.success(`WBS 업무 ${items.length}건을 등록했습니다.`)
+      setQuickText('')
+      setShowQuickInput(false)
+      loadProjects()
+      refreshTasks()
+    } catch (e) {
+      toast.error('빠른 입력 저장 실패')
+    }
+  }
+
+  const handleBulkApply = async () => {
+    if (selectedTaskIds.length === 0) return toast.error('일괄 수정할 업무를 선택하세요.')
+    const updates = {}
+    if (bulkForm.담당자명) updates.담당자명 = bulkForm.담당자명
+    if (bulkForm.시작일) updates.시작일 = bulkForm.시작일
+    if (bulkForm.마감일) updates.마감일 = bulkForm.마감일
+    if (bulkForm.우선순위) updates.우선순위 = bulkForm.우선순위
+    if (bulkForm.상태) updates.상태 = bulkForm.상태
+    if (bulkForm.주요업무) updates.주요업무 = bulkForm.주요업무 === 'true'
+
+    if (Object.keys(updates).length === 0) return toast.error('변경할 값을 입력하세요.')
+
+    try {
+      await bulkUpdateTasks(selectedTaskIds, updates, currentUser?.이름)
+      toast.success(`선택 업무 ${selectedTaskIds.length}건을 수정했습니다.`)
+      setSelectedTaskIds([])
+      setBulkForm({ 담당자명: '', 시작일: '', 마감일: '', 우선순위: '', 상태: '', 주요업무: '' })
+      loadProjects()
+      refreshTasks()
+    } catch (e) {
+      toast.error('일괄 수정 실패')
+    }
+  }
+
+  const toggleSelectedTask = (taskId) => {
+    const id = String(taskId)
+    setSelectedTaskIds(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id])
+  }
+
+  const handleStructureChange = async (action, task) => {
+    const targetId = String(task.id)
+    const sorted = [...tasks].sort((a, b) => Number(a.wbs_order || 0) - Number(b.wbs_order || 0) || String(a.start_date || '').localeCompare(String(b.start_date || '')))
+    const sameParent = sorted.filter(t => String(t.parent_id || '') === String(task.parent_id || ''))
+    const index = sameParent.findIndex(t => String(t.id) === targetId)
+
+    try {
+      if (action === 'up' || action === 'down') {
+        const swapIndex = action === 'up' ? index - 1 : index + 1
+        const swapWith = sameParent[swapIndex]
+        if (!swapWith) return toast.error(action === 'up' ? '이미 가장 위에 있습니다.' : '이미 가장 아래에 있습니다.')
+        await updateTask(task.id, { WBS순서: swapIndex }, currentUser?.이름)
+        await updateTask(swapWith.id, { WBS순서: index }, currentUser?.이름)
+      }
+
+      if (action === 'indent') {
+        const newParent = sameParent[index - 1]
+        if (!newParent) return toast.error('바로 위 업무가 있어야 하위로 이동할 수 있습니다.')
+        const depth = wbsTree.byId.get(String(newParent.id))?.depth || 0
+        if (depth >= MAX_WBS_DEPTH) return toast.error('레벨4 아래로는 이동할 수 없습니다.')
+        await updateTask(task.id, { 상위업무ID: newParent.id, WBS순서: 9999 }, currentUser?.이름)
+      }
+
+      if (action === 'outdent') {
+        if (!task.parent_id) return toast.error('이미 메인 TASK입니다.')
+        const parent = tasks.find(t => String(t.id) === String(task.parent_id))
+        await updateTask(task.id, { 상위업무ID: parent?.parent_id || null, WBS순서: Number(parent?.wbs_order || 0) + 0.1 }, currentUser?.이름)
+      }
+
+      toast.success('WBS 구조가 변경되었습니다.')
+      loadProjects()
+      refreshTasks()
+    } catch (e) {
+      toast.error('WBS 구조 변경 실패')
+    }
   }
 
   const handleDeleteTask = async () => {
@@ -428,8 +585,14 @@ export default function TimelinePage() {
               </span>
               <div className="flex items-center gap-3">
                 <p className="text-xs text-slate-400 hidden lg:block">
-                  메인 TASK부터 레벨4까지 확장 가능 · 행의 +로 바로 하위 TASK 추가
+                  붙여넣기 입력 · WBS 번호 · 선택 일괄 변경 지원
                 </p>
+                <button onClick={() => { setQuickText(DEFAULT_WBS_TEMPLATE); setShowQuickInput(true) }} className="btn-secondary text-xs py-1.5 px-2.5">
+                  <Wand2 size={14}/> 템플릿
+                </button>
+                <button onClick={() => setShowQuickInput(v => !v)} className="btn-secondary text-xs py-1.5 px-2.5">
+                  <ClipboardList size={14}/> 빠른 입력
+                </button>
                 <button onClick={() => handleOpenTaskModal()} className="btn-secondary text-xs py-1.5 px-2.5">
                   <Plus size={14}/> 메인 TASK 추가
                 </button>
@@ -437,9 +600,60 @@ export default function TimelinePage() {
             </div>
 
             <div className="flex-1 p-4">
+               {showQuickInput && (
+                 <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+                   <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                     <div>
+                       <p className="text-sm font-bold text-slate-800 dark:text-slate-100">WBS 빠른 입력</p>
+                       <p className="text-xs text-slate-500 dark:text-slate-400">들여쓰기 2칸마다 하위 업무로 등록됩니다. 형식: 업무명 | 담당자 | 시작일 | 마감일 | 우선순위 | 주요</p>
+                     </div>
+                     <div className="flex gap-2">
+                       <button onClick={() => setQuickText(DEFAULT_WBS_TEMPLATE)} className="btn-secondary text-xs py-1.5 px-2.5">예시 채우기</button>
+                       <button onClick={handleCreateOutline} className="btn-primary text-xs py-1.5 px-2.5"><Save size={14}/> 등록</button>
+                     </div>
+                   </div>
+                   <textarea
+                     className="h-44 w-full resize-y rounded-lg border border-indigo-100 bg-white p-3 font-mono text-xs leading-6 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-indigo-500/20 dark:bg-slate-900 dark:text-slate-100"
+                     value={quickText}
+                     onChange={e => setQuickText(e.target.value)}
+                     placeholder="예:&#10;기획 | 김팀원 | 2026-07-08 | 2026-07-10 | 높음 | 주요&#10;  요구사항 정리 | 김팀원 | 2026-07-08 | 2026-07-08"
+                   />
+                 </div>
+               )}
+
+               <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/30">
+                 <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                   <div className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                     선택 업무 일괄 변경 <span className="text-indigo-600">{selectedTaskIds.length}</span>건
+                   </div>
+                   <div className="flex gap-2">
+                     <button onClick={() => setSelectedTaskIds(tasks.map(t => String(t.id)))} className="btn-secondary text-xs py-1.5 px-2.5">전체 선택</button>
+                     <button onClick={() => setSelectedTaskIds([])} className="btn-secondary text-xs py-1.5 px-2.5">선택 해제</button>
+                     <button onClick={handleBulkApply} className="btn-primary text-xs py-1.5 px-2.5">일괄 적용</button>
+                   </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
+                   <input className="input-field" placeholder="담당자" value={bulkForm.담당자명} onChange={e => setBulkForm({...bulkForm, 담당자명: e.target.value})} />
+                   <input type="date" className="input-field" value={bulkForm.시작일} onChange={e => setBulkForm({...bulkForm, 시작일: e.target.value})} />
+                   <input type="date" className="input-field" value={bulkForm.마감일} onChange={e => setBulkForm({...bulkForm, 마감일: e.target.value})} />
+                   <select className="input-field" value={bulkForm.우선순위} onChange={e => setBulkForm({...bulkForm, 우선순위: e.target.value})}>
+                     <option value="">우선순위 유지</option><option>낮음</option><option>보통</option><option>높음</option>
+                   </select>
+                   <select className="input-field" value={bulkForm.상태} onChange={e => setBulkForm({...bulkForm, 상태: e.target.value})}>
+                     <option value="">상태 유지</option><option>대기</option><option>진행중</option><option>검토요청</option><option>보류</option><option>완료</option>
+                   </select>
+                   <select className="input-field" value={bulkForm.주요업무} onChange={e => setBulkForm({...bulkForm, 주요업무: e.target.value})}>
+                     <option value="">주요업무 유지</option><option value="true">주요업무 지정</option><option value="false">주요업무 해제</option>
+                   </select>
+                 </div>
+               </div>
+
                <CompactTimeline
                  tasks={tasks}
                  maxDepth={MAX_WBS_DEPTH}
+                 selectedIds={selectedTaskIds}
+                 onToggleSelect={toggleSelectedTask}
+                 onStructureChange={handleStructureChange}
                  onTaskClick={handleOpenTaskModal}
                  onToggleComplete={handleToggleComplete}
                  onAddSubtask={(parentTask) => handleOpenTaskModal(null, parentTask)}
@@ -560,10 +774,46 @@ export default function TimelinePage() {
                     </select>
                 </div>
               </div>
-              
+
+              <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800 md:grid-cols-2">
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={taskForm.주요업무}
+                    onChange={e => setTaskForm({...taskForm, 주요업무: e.target.checked})}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  이번 주/일일 모니터링 주요업무
+                </label>
+                <div>
+                  <label className="label-text">선행 업무</label>
+                  <select className="w-full input-field" value={taskForm.선행업무ID} onChange={e => setTaskForm({...taskForm, 선행업무ID: e.target.value})}>
+                    <option value="">없음</option>
+                    {allTasks
+                      .filter(t => String(t.프로젝트ID) === String(taskForm.프로젝트ID || selectedProjectId) && String(t.ID) !== String(editingTask?.id || editingTask?.ID || ''))
+                      .map(t => <option key={t.ID} value={t.ID}>{t.제목}</option>)}
+                  </select>
+                </div>
+              </div>
+               
               <div>
                 <label className="label-text">상세 내용</label>
                 <textarea className="w-full input-field h-24 resize-none" value={taskForm.내용} onChange={e => setTaskForm({...taskForm, 내용: e.target.value})} placeholder="업무 내용을 입력하세요..." />
+              </div>
+
+              <div>
+                <label className="label-text">완료 기준</label>
+                <textarea className="w-full input-field h-20 resize-none" value={taskForm.완료기준} onChange={e => setTaskForm({...taskForm, 완료기준: e.target.value})} placeholder="무엇이 확인되면 완료로 볼지 적어주세요." />
+              </div>
+
+              <div>
+                <label className="label-text">산출물 링크</label>
+                <input className="w-full input-field" value={taskForm.산출물링크} onChange={e => setTaskForm({...taskForm, 산출물링크: e.target.value})} placeholder="문서, 시트, PR, 결과물 URL" />
+              </div>
+
+              <div>
+                <label className="label-text">지연 사유 / 도움 필요</label>
+                <textarea className="w-full input-field h-20 resize-none" value={taskForm.지연사유} onChange={e => setTaskForm({...taskForm, 지연사유: e.target.value})} placeholder="지연 중이거나 의사결정/지원이 필요한 내용을 남깁니다." />
               </div>
             </div>
 

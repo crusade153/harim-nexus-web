@@ -6,7 +6,7 @@ import {
   startOfWeek, endOfWeek, eachWeekOfInterval, eachDayOfInterval,
 } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { CheckCircle2, Circle, AlertTriangle, ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { CheckCircle2, Circle, AlertTriangle, ChevronDown, ChevronRight, Plus, ArrowUp, ArrowDown, IndentIncrease, IndentDecrease } from 'lucide-react'
 
 // 상태별 색상
 const C = {
@@ -26,7 +26,7 @@ function parseDate(v) {
   return new Date(y, m - 1, d)
 }
 
-export default function CompactTimeline({ tasks = [], maxDepth = 3, onTaskClick, onToggleComplete, onAddSubtask }) {
+export default function CompactTimeline({ tasks = [], maxDepth = 3, selectedIds = [], onToggleSelect, onStructureChange, onTaskClick, onToggleComplete, onAddSubtask }) {
   const [scale, setScale] = useState('month') // 'day' | 'week' | 'month'
   const [collapsed, setCollapsed] = useState(() => new Set()) // 접힌 상위 업무 id
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
@@ -50,7 +50,24 @@ export default function CompactTimeline({ tasks = [], maxDepth = 3, onTaskClick,
       const done = t.status === '완료'
       const overdue = !done && end < today
       const active = !done && start <= today && today <= end
-      return { raw: t, id: String(t.id), parentId: t.parent_id ? String(t.parent_id) : null, name: t.title, assignee: t.assignee, start, end, done, overdue, active }
+      return {
+        raw: t,
+        id: String(t.id),
+        parentId: t.parent_id ? String(t.parent_id) : null,
+        name: t.title,
+        assignee: t.assignee,
+        start,
+        end,
+        done,
+        overdue,
+        active,
+        order: Number(t.wbs_order || 0),
+        isKey: Boolean(t.is_key_task),
+        acceptanceCriteria: t.acceptance_criteria || '',
+        deliverableUrl: t.deliverable_url || '',
+        delayReason: t.delay_reason || '',
+        predecessorId: t.predecessor_id ? String(t.predecessor_id) : null,
+      }
     }).filter(Boolean)
 
     const ids = new Set(items.map(i => i.id))
@@ -63,13 +80,14 @@ export default function CompactTimeline({ tasks = [], maxDepth = 3, onTaskClick,
       } else roots.push(i)
     })
 
-    const byStart = (a, b) => a.start - b.start || a.end - b.end
+    const byStart = (a, b) => a.order - b.order || a.start - b.start || a.end - b.end
     const flat = []
-    const walk = (list, depth) => {
-      list.sort(byStart).forEach(i => {
+    const walk = (list, depth, prefix = []) => {
+      list.sort(byStart).forEach((i, index) => {
         const kids = childrenOf.get(i.id) || []
-        flat.push({ ...i, depth, level: depth + 1, childCount: kids.length, childDone: kids.filter(k => k.done).length })
-        if (kids.length > 0 && !collapsed.has(i.id)) walk(kids, depth + 1)
+        const number = [...prefix, index + 1].join('.')
+        flat.push({ ...i, depth, level: depth + 1, number, childCount: kids.length, childDone: kids.filter(k => k.done).length })
+        if (kids.length > 0 && !collapsed.has(i.id)) walk(kids, depth + 1, [...prefix, index + 1])
       })
     }
     walk(roots, 0)
@@ -156,7 +174,7 @@ export default function CompactTimeline({ tasks = [], maxDepth = 3, onTaskClick,
       <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
         {/* 눈금 헤더 */}
         <div className="grid bg-slate-50/70 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-700" style={{ gridTemplateColumns: `${LEFT} minmax(0, 1fr)` }}>
-          <div className="px-3 py-2 text-[11px] font-bold text-slate-400 uppercase">담당자 · 기간</div>
+          <div className="px-3 py-2 text-[11px] font-bold text-slate-400 uppercase">WBS · 담당자 · 기간</div>
           <div className="flex overflow-hidden">
             {ticks.map(t => (
               <div key={t.key} style={{ width: `${t.width}%` }} className="text-center text-[11px] font-bold text-slate-500 dark:text-slate-400 py-2 border-l border-slate-100 dark:border-slate-700/50 overflow-hidden whitespace-nowrap">
@@ -176,6 +194,15 @@ export default function CompactTimeline({ tasks = [], maxDepth = 3, onTaskClick,
               <div key={r.id} className="grid border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50/60 dark:hover:bg-slate-700/20 group" style={{ gridTemplateColumns: `${LEFT} minmax(0, 1fr)` }}>
                 {/* 좌측: 트리(들여쓰기·접기) + 체크 + 정보 */}
                 <div className="py-2 pr-2 flex items-center gap-1.5 overflow-hidden" style={{ paddingLeft: `${12 + r.depth * 18}px` }}>
+                  {onToggleSelect && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(r.id)}
+                      onChange={() => onToggleSelect(r.id)}
+                      className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      title="일괄 변경 선택"
+                    />
+                  )}
                   {r.depth > 0 && <span className="shrink-0 text-slate-300 dark:text-slate-600 text-[11px] leading-none select-none">└</span>}
                   {r.childCount > 0 ? (
                     <button onClick={() => toggleCollapse(r.id)} title={collapsed.has(r.id) ? '하위 업무 펼치기' : '하위 업무 접기'} className="shrink-0 text-slate-400 hover:text-indigo-500">
@@ -190,12 +217,17 @@ export default function CompactTimeline({ tasks = [], maxDepth = 3, onTaskClick,
                   <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onTaskClick && onTaskClick(r.raw)}>
                     <div className={`text-[13px] truncate flex items-center gap-1 ${r.depth === 0 ? 'font-bold' : 'font-medium'} ${r.done ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}>
                       {r.overdue && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
-                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-700 dark:text-slate-300">L{r.level}</span>
+                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-700 dark:text-slate-300">{r.number}</span>
+                      {r.isKey && <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">주요</span>}
                       {r.name}
                     </div>
                     <div className="text-[10px] text-slate-400 truncate">
                       {r.assignee || '미정'} · {format(r.start, 'M/d')}~{format(r.end, 'M/d')}
+                      {r.predecessorId && <span className="ml-1 text-purple-400 font-bold">선행 #{r.predecessorId}</span>}
                       {r.childCount > 0 && <span className="ml-1 text-indigo-400 font-bold">하위 {r.childDone}/{r.childCount}</span>}
+                      {r.acceptanceCriteria && <span className="ml-1 text-green-500 font-bold">완료기준</span>}
+                      {r.delayReason && <span className="ml-1 text-red-500 font-bold">지연사유</span>}
+                      {r.deliverableUrl && <span className="ml-1 text-blue-500 font-bold">산출물</span>}
                     </div>
                   </div>
                   {onAddSubtask && r.depth < maxDepth && (
@@ -203,6 +235,14 @@ export default function CompactTimeline({ tasks = [], maxDepth = 3, onTaskClick,
                       className="shrink-0 p-1 rounded-md text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors">
                       <Plus size={14} />
                     </button>
+                  )}
+                  {onStructureChange && (
+                    <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                      <button onClick={() => onStructureChange('up', r.raw)} title="같은 레벨에서 위로" className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-700"><ArrowUp size={13} /></button>
+                      <button onClick={() => onStructureChange('down', r.raw)} title="같은 레벨에서 아래로" className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-700"><ArrowDown size={13} /></button>
+                      <button onClick={() => onStructureChange('indent', r.raw)} title="바로 위 업무의 하위로 이동" className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-700"><IndentIncrease size={13} /></button>
+                      <button onClick={() => onStructureChange('outdent', r.raw)} title="상위 레벨로 이동" className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-700"><IndentDecrease size={13} /></button>
+                    </div>
                   )}
                 </div>
                 {/* 우측: 타임라인 트랙 */}
