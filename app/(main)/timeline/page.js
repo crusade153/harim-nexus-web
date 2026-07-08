@@ -332,6 +332,72 @@ export default function TimelinePage() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedTaskIds.length === 0) return toast.error('삭제할 업무를 선택하세요.')
+
+    const selected = new Set(selectedTaskIds.map(String))
+    const byId = new Map(tasks.map(t => [String(t.id), t]))
+    const childrenByParent = new Map()
+
+    tasks.forEach(t => {
+      const parentId = t.parent_id ? String(t.parent_id) : null
+      if (!parentId) return
+      if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, [])
+      childrenByParent.get(parentId).push(t)
+    })
+
+    const hasSelectedAncestor = (task) => {
+      let parentId = task.parent_id ? String(task.parent_id) : null
+      while (parentId) {
+        if (selected.has(parentId)) return true
+        parentId = byId.get(parentId)?.parent_id ? String(byId.get(parentId).parent_id) : null
+      }
+      return false
+    }
+
+    const rootTargets = selectedTaskIds
+      .map(id => byId.get(String(id)))
+      .filter(Boolean)
+      .filter(task => !hasSelectedAncestor(task))
+
+    const collectDescendants = (taskId, acc = new Set()) => {
+      const kids = childrenByParent.get(String(taskId)) || []
+      kids.forEach(child => {
+        const childId = String(child.id)
+        if (acc.has(childId)) return
+        acc.add(childId)
+        collectDescendants(childId, acc)
+      })
+      return acc
+    }
+
+    const affected = new Set()
+    rootTargets.forEach(task => {
+      affected.add(String(task.id))
+      collectDescendants(task.id, affected)
+    })
+
+    const rootCount = rootTargets.length
+    const childCount = Math.max(0, affected.size - rootCount)
+    const message = childCount > 0
+      ? `선택한 업무 ${rootCount}건과 연결된 하위 업무 ${childCount}건, 총 ${affected.size}건이 삭제됩니다. 계속하시겠습니까?`
+      : `선택한 업무 ${rootCount}건을 삭제합니다. 계속하시겠습니까?`
+
+    if (!confirm(message)) return
+
+    try {
+      for (const task of rootTargets) {
+        await deleteTask(task.id, currentUser?.이름)
+      }
+      toast.success(`WBS 업무 ${affected.size}건을 삭제했습니다.`)
+      setSelectedTaskIds([])
+      loadProjects()
+      refreshTasks()
+    } catch (e) {
+      toast.error('선택 업무 삭제 실패')
+    }
+  }
+
   const toggleSelectedTask = (taskId) => {
     const id = String(taskId)
     setSelectedTaskIds(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id])
@@ -624,12 +690,15 @@ export default function TimelinePage() {
                <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/30">
                  <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                    <div className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                     선택 업무 일괄 변경 <span className="text-indigo-600">{selectedTaskIds.length}</span>건
+                     선택 업무 일괄 관리 <span className="text-indigo-600">{selectedTaskIds.length}</span>건
                    </div>
                    <div className="flex gap-2">
                      <button onClick={() => setSelectedTaskIds(tasks.map(t => String(t.id)))} className="btn-secondary text-xs py-1.5 px-2.5">전체 선택</button>
                      <button onClick={() => setSelectedTaskIds([])} className="btn-secondary text-xs py-1.5 px-2.5">선택 해제</button>
                      <button onClick={handleBulkApply} className="btn-primary text-xs py-1.5 px-2.5">일괄 적용</button>
+                     <button onClick={handleBulkDelete} className="flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20">
+                       <Trash2 size={14}/> 선택 삭제
+                     </button>
                    </div>
                  </div>
                  <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
