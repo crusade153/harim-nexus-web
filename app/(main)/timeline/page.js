@@ -4,7 +4,7 @@ import CompactTimeline from '@/components/CompactTimeline'
 import WeeklyBoard from '@/components/WeeklyBoard'
 import Skeleton from '@/components/Skeleton'
 import { getRealData, getProjectTasks, createTask, updateTask, deleteProject, createProject, updateProject, deleteTask, toggleTaskStatus, createWbsOutlineTasks, bulkUpdateTasks } from '@/lib/sheets'
-import { Plus, Folder, Calendar, Edit2, Trash2, X, Save, Clock, LayoutGrid, BarChart3, ChevronDown, UserRound, ClipboardList, Wand2 } from 'lucide-react'
+import { Plus, Folder, Calendar, Edit2, Trash2, X, Save, Clock, LayoutGrid, BarChart3, ChevronDown, ChevronUp, UserRound, ClipboardList, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -128,6 +128,7 @@ export default function TimelinePage() {
   const [quickText, setQuickText] = useState('')
   const [selectedTaskIds, setSelectedTaskIds] = useState([])
   const [bulkForm, setBulkForm] = useState({ 담당자명: '', 시작일: '', 마감일: '', 우선순위: '', 상태: '', 주요업무: '' })
+  const [areWbsToolsCollapsed, setAreWbsToolsCollapsed] = useState(false)
 
   const loadProjects = async () => {
     const data = await getRealData()
@@ -152,6 +153,13 @@ export default function TimelinePage() {
     const projectTasks = await getProjectTasks(selectedProjectId)
     setTasks(projectTasks)
   }
+
+  const projectTaskProgress = useMemo(() => {
+    const total = tasks.length
+    const completed = tasks.filter(t => t.status === '완료').length
+    const rate = total === 0 ? 0 : Math.round((completed / total) * 100)
+    return { total, completed, rate }
+  }, [tasks])
 
   const handleOpenProjectModal = (project = null) => {
     if (project) {
@@ -573,6 +581,14 @@ export default function TimelinePage() {
           </div>
         )}
         <span className="text-xs text-slate-400 ml-1">{projects.length}개 프로젝트</span>
+        <button
+          onClick={() => setAreWbsToolsCollapsed(v => !v)}
+          className="ml-1 flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 transition-colors hover:border-indigo-200 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-indigo-500/30 dark:hover:text-indigo-400"
+          title={areWbsToolsCollapsed ? 'WBS 작성 도구 펼치기' : 'WBS 작성 도구 접기'}
+        >
+          {areWbsToolsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          {areWbsToolsCollapsed ? '도구 펼치기' : '도구 접기'}
+        </button>
         {(() => {
           const project = projects.find(p => p.ID === selectedProjectId)
           if (!project) return null
@@ -590,25 +606,37 @@ export default function TimelinePage() {
                 <b className="text-slate-500 dark:text-slate-400">작성자</b>
                 {project.작성자 || '미지정'}
               </span>
-              {schedule ? (
-                <div className="flex min-w-[190px] flex-1 items-center gap-2 md:max-w-[300px]">
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" title={`기간 진척률 ${schedule.progress}%`}>
-                    <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${schedule.progress}%` }} />
+              <div className="flex min-w-[240px] flex-1 flex-col gap-1 md:max-w-[360px]">
+                {schedule ? (
+                  <div className="flex items-center gap-2">
+                    <span className="w-14 shrink-0 text-[11px] font-bold text-slate-400">기간 경과</span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" title={`기간 경과율 ${schedule.progress}%`}>
+                      <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${schedule.progress}%` }} />
+                    </div>
+                    <span className="w-20 whitespace-nowrap text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                      {schedule.progress}% · {schedule.remainingLabel}
+                    </span>
                   </div>
-                  <span className="whitespace-nowrap text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                    {schedule.progress}% · {schedule.remainingLabel}
+                ) : (
+                  <span className="text-xs text-slate-400">기간 진척률 산정 불가</span>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="w-14 shrink-0 text-[11px] font-bold text-slate-400">업무 완료</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" title={`업무 완료율 ${projectTaskProgress.rate}%`}>
+                    <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${projectTaskProgress.rate}%` }} />
+                  </div>
+                  <span className="w-20 whitespace-nowrap text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    {projectTaskProgress.rate}% · {projectTaskProgress.completed}/{projectTaskProgress.total}
                   </span>
                 </div>
-              ) : (
-                <span className="text-xs text-slate-400">기간 진척률 산정 불가</span>
-              )}
+              </div>
             </div>
           )
         })()}
       </div>
 
       {/* 보고 머리말: 문제점 → 개선방향 → 개선목표 */}
-      {(() => {
+      {!areWbsToolsCollapsed && (() => {
         const cp = projects.find(p => p.ID === selectedProjectId)
         if (!cp) return null
         const has = cp.문제점 || cp.개선방향 || cp.개선목표
@@ -651,22 +679,26 @@ export default function TimelinePage() {
               </span>
               <div className="flex items-center gap-3">
                 <p className="text-xs text-slate-400 hidden lg:block">
-                  붙여넣기 입력 · WBS 번호 · 선택 일괄 변경 지원
+                  {areWbsToolsCollapsed ? '작성 도구 접힘 · WBS 표 우선 보기' : '붙여넣기 입력 · WBS 번호 · 선택 일괄 변경 지원'}
                 </p>
-                <button onClick={() => { setQuickText(DEFAULT_WBS_TEMPLATE); setShowQuickInput(true) }} className="btn-secondary text-xs py-1.5 px-2.5">
-                  <Wand2 size={14}/> 템플릿
-                </button>
-                <button onClick={() => setShowQuickInput(v => !v)} className="btn-secondary text-xs py-1.5 px-2.5">
-                  <ClipboardList size={14}/> 빠른 입력
-                </button>
-                <button onClick={() => handleOpenTaskModal()} className="btn-secondary text-xs py-1.5 px-2.5">
-                  <Plus size={14}/> 메인 TASK 추가
-                </button>
+                {!areWbsToolsCollapsed && (
+                  <>
+                    <button onClick={() => { setQuickText(DEFAULT_WBS_TEMPLATE); setShowQuickInput(true) }} className="btn-secondary text-xs py-1.5 px-2.5">
+                      <Wand2 size={14}/> 템플릿
+                    </button>
+                    <button onClick={() => setShowQuickInput(v => !v)} className="btn-secondary text-xs py-1.5 px-2.5">
+                      <ClipboardList size={14}/> 빠른 입력
+                    </button>
+                    <button onClick={() => handleOpenTaskModal()} className="btn-secondary text-xs py-1.5 px-2.5">
+                      <Plus size={14}/> 메인 TASK 추가
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="flex-1 p-4">
-               {showQuickInput && (
+               {!areWbsToolsCollapsed && showQuickInput && (
                  <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
                    <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                      <div>
@@ -687,6 +719,7 @@ export default function TimelinePage() {
                  </div>
                )}
 
+               {!areWbsToolsCollapsed && (
                <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/30">
                  <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                    <div className="text-sm font-bold text-slate-700 dark:text-slate-200">
@@ -716,6 +749,7 @@ export default function TimelinePage() {
                    </select>
                  </div>
                </div>
+               )}
 
                <CompactTimeline
                  tasks={tasks}

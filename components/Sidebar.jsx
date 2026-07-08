@@ -14,12 +14,13 @@ import {
   LogOut, 
   Megaphone,
   GanttChartSquare,
-  FileBarChart2
+  FileBarChart2,
+  PanelLeftClose
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
-export default function Sidebar() {
+export default function Sidebar({ isHidden = false, onToggleHidden }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -110,7 +111,7 @@ export default function Sidebar() {
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-[240px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col
         transform transition-transform duration-300 ease-in-out
-        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${isMobileOpen ? 'translate-x-0' : isHidden ? '-translate-x-full' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-sm">N</div>
@@ -118,6 +119,13 @@ export default function Sidebar() {
             <h1 className="font-bold text-slate-900 dark:text-white tracking-tight">Nexus</h1>
             <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Workspace</p>
           </div>
+          <button
+            onClick={onToggleHidden}
+            title="사이드바 숨기기"
+            className="ml-auto hidden rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-800 dark:hover:text-indigo-400 lg:block"
+          >
+            <PanelLeftClose size={17} />
+          </button>
         </div>
 
         <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">

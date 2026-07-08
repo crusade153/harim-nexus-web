@@ -1,10 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Search, Bell, Settings, Moon, Sun } from 'lucide-react'
+import { Search, Bell, Settings, Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import SettingsModal from './SettingsModal' // ✅ [추가] 모달 import
 
-export default function Header() {
+export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
   const [isDark, setIsDark] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -60,6 +60,13 @@ export default function Header() {
         <div className="flex items-center justify-between h-full max-w-[1600px] mx-auto">
           
           <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <button
+              onClick={onToggleSidebar}
+              title={isSidebarHidden ? '사이드바 표시' : '사이드바 숨기기'}
+              className="mr-2 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-800 dark:hover:text-indigo-400"
+            >
+              {isSidebarHidden ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
             <span className="font-medium text-slate-800 dark:text-slate-200">Harim Foods</span>
             <span className="text-slate-300 dark:text-slate-600">/</span>
             <span>원가팀</span>
