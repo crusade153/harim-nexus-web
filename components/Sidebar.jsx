@@ -15,7 +15,8 @@ import {
   Megaphone,
   GanttChartSquare,
   FileBarChart2,
-  PanelLeftClose
+  PanelLeftClose,
+  Network
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
@@ -36,6 +37,7 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
     { id: 'board', name: '게시판 & 이슈', icon: Megaphone, badge: 'New', path: '/board' },
     { id: 'archive', name: '팀 아카이브', icon: Archive, path: '/archive' }, 
     { id: 'calendar', name: '캘린더', icon: CalendarDays, path: '/calendar' },
+    { id: 'organization', name: '조직 · MBO', icon: Network, badge: 'RACI', path: '/organization' },
     { id: 'members', name: '팀원 관리', icon: Users, path: '/members' },
     // 팀장(관리자) 전용: 경영진 보고 리포트
     { id: 'report', name: '경영진 보고', icon: FileBarChart2, badge: 'Admin', path: '/report', adminOnly: true },
