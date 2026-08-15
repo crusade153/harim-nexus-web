@@ -25,7 +25,7 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
   const pathname = usePathname()
   const router = useRouter()
 
-  const [myProfile, setMyProfile] = useState({ name: '', position: '', initial: '', loginId: '' })
+  const [myProfile, setMyProfile] = useState({ name: '', position: '', initial: '', loginId: '', role: 'member' })
 
   const menuItems = [
     { id: 'dashboard', name: '대시보드', icon: LayoutDashboard, path: '/dashboard' },
@@ -42,7 +42,7 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
   ]
 
   const SYS_ADMIN_ID = 'crusade153'
-  const isAdmin = myProfile.loginId === SYS_ADMIN_ID
+  const isAdmin = myProfile.role === 'admin' || myProfile.loginId === SYS_ADMIN_ID
   const visibleMenuItems = menuItems.filter(item => !item.adminOnly || isAdmin)
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
       if (user) {
         const { data: member } = await supabase
           .from('members')
-          .select('name, position, login_id')
+          .select('name, position, login_id, role')
           .eq('auth_id', user.id)
           .single()
         
@@ -63,7 +63,8 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
             name: member.name,
             position: member.position,
             initial: member.name ? member.name[0] : '?',
-            loginId: member.login_id
+            loginId: member.login_id,
+            role: member.role || 'member'
           })
 
           channel = supabase.channel('room_presence', {

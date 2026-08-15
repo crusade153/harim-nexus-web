@@ -1,15 +1,39 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
+import { supabase } from '@/lib/supabase'
 
 export default function MainLayout({ children }) {
+  const router = useRouter()
   const [isSidebarHidden, setIsSidebarHidden] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
     setIsSidebarHidden(localStorage.getItem('nexus_sidebar_hidden') === 'true')
-  }, [])
+
+    const checkAccess = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.replace('/login')
+        return
+      }
+      const { data: member } = await supabase
+        .from('members')
+        .select('approved, status')
+        .eq('auth_id', user.id)
+        .maybeSingle()
+      if (!member || member.approved !== true || member.status === 'pending') {
+        await supabase.auth.signOut()
+        router.replace('/login')
+        return
+      }
+      setAuthChecked(true)
+    }
+    checkAccess()
+  }, [router])
 
   const toggleSidebar = () => {
     setIsSidebarHidden(prev => {
@@ -17,6 +41,10 @@ export default function MainLayout({ children }) {
       localStorage.setItem('nexus_sidebar_hidden', String(next))
       return next
     })
+  }
+
+  if (!authChecked) {
+    return <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-sm text-slate-500">로그인 상태를 확인하고 있습니다...</div>
   }
 
   return (

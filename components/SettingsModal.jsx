@@ -1,17 +1,22 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { updateMyProfile } from '@/lib/sheets'
-import { X, Save, Smile } from 'lucide-react'
+import { updateMyProfile, changeMyPassword } from '@/lib/sheets'
+import { X, Save, Smile, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false)
   const [user, setUser] = useState(null)
-  
+
   // 입력 폼 상태
   const [status, setStatus] = useState('온라인')
   const [message, setMessage] = useState('')
+
+  // 비밀번호 변경 폼
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
 
   // 모달 열릴 때 내 정보 불러오기
   useEffect(() => {
@@ -52,6 +57,24 @@ export default function SettingsModal({ isOpen, onClose }) {
       toast.error('업데이트 실패')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 8) return toast.error('비밀번호는 8자 이상이어야 합니다.')
+    if (newPassword !== confirmPassword) return toast.error('비밀번호 확인이 일치하지 않습니다.')
+
+    setPwLoading(true)
+    try {
+      await changeMyPassword(newPassword)
+      setNewPassword('')
+      setConfirmPassword('')
+      toast.success('비밀번호가 변경되었습니다.')
+    } catch (error) {
+      console.error(error)
+      toast.error(error.message || '비밀번호 변경 실패')
+    } finally {
+      setPwLoading(false)
     }
   }
 
@@ -106,6 +129,39 @@ export default function SettingsModal({ isOpen, onClose }) {
               className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white transition-all text-sm"
             />
             <p className="text-[10px] text-slate-400 text-right">{message.length}/20자</p>
+          </div>
+
+          {/* 3. 비밀번호 변경 */}
+          <div className="space-y-2 pt-5 border-t border-dashed border-slate-200 dark:border-slate-700">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase">
+              <KeyRound size={13} className="text-amber-500" /> 비밀번호 변경
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="새 비밀번호 (8자 이상)"
+              autoComplete="new-password"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none dark:text-white transition-all text-sm"
+            />
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="새 비밀번호 확인"
+              autoComplete="new-password"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none dark:text-white transition-all text-sm"
+            />
+            <button
+              onClick={handleChangePassword}
+              disabled={pwLoading || newPassword.length < 8}
+              className="w-full py-2.5 rounded-xl border border-amber-300 dark:border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {pwLoading ? '변경 중...' : '비밀번호 변경'}
+            </button>
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              ※ 임시 비밀번호를 받으셨다면 여기서 본인만 아는 비밀번호로 바꿔주세요.
+            </p>
           </div>
         </div>
 

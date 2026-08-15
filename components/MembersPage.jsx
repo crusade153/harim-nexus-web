@@ -1,8 +1,14 @@
 'use client'
 import { useState } from 'react'
-import { Mail, Calendar, ShieldCheck, Crown, Settings2, Trash2, Check, X, UserCheck } from 'lucide-react'
+import { Mail, Calendar, ShieldCheck, Crown, Settings2, Trash2, Check, X, UserCheck, KeyRound, Shuffle, Copy, UserPlus, Link2Off, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { adminUpdateMember, adminApproveMember, adminDeleteMember } from '@/lib/sheets'
+import { adminCreateMember, adminUpdateMember, adminApproveMember, adminDeleteMember, adminResetMemberPassword } from '@/lib/sheets'
+
+// 사람이 부르고 받아적기 쉬운 임시 비밀번호 (헷갈리는 0/O, 1/l 제외)
+const generateTempPassword = () => {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789'
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
 
 // 업무부하 계산 로직
 const calculateWorkload = (member, tasks, projects) => {
@@ -28,32 +34,85 @@ const STATUS_OPTIONS = [
 export default function MembersPage({ members, tasks, projects, currentUser, onRefresh }) {
   // 관리자 ID 정의
   const SYS_ADMIN_ID = 'crusade153'
-  const isAdmin = currentUser?.아이디 === SYS_ADMIN_ID
+  const isAdmin = currentUser?.역할 === 'admin' || currentUser?.아이디 === SYS_ADMIN_ID
 
   const [editingMember, setEditingMember] = useState(null)
-  const [form, setForm] = useState({ 이름: '', 직위: '', 부서: '', 이메일: '', 입사일: '', 상태: 'active' })
+  const [isCreating, setIsCreating] = useState(false)
+  const [form, setForm] = useState({ 아이디: '', 이름: '', 직위: '', 부서: '', 이메일: '', 입사일: '', 상태: 'active', 역할: 'member', 오늘의한마디: '', 비밀번호: '' })
+  const [newPassword, setNewPassword] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [lastIssuedPw, setLastIssuedPw] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showIssuedPassword, setShowIssuedPassword] = useState(false)
 
   const openEdit = (m) => {
     setEditingMember(m)
+    setIsCreating(false)
     setForm({
-      이름: m.이름 || '', 직위: m.직위 || '', 부서: m.부서 || '',
-      이메일: m.이메일 || '', 입사일: m.입사일 || '', 상태: m.상태 || 'active'
+      아이디: m.아이디 || '', 이름: m.이름 || '', 직위: m.직위 || '', 부서: m.부서 || '',
+      이메일: m.이메일 || '', 입사일: m.입사일 || '', 상태: m.상태 || 'active',
+      역할: m.역할 || 'member', 오늘의한마디: m.오늘의한마디 || '', 비밀번호: ''
     })
+    setNewPassword('')
+    setLastIssuedPw('')
+    setShowPassword(false)
+    setShowIssuedPassword(false)
+  }
+
+  const openCreate = () => {
+    setEditingMember(null)
+    setIsCreating(true)
+    setForm({
+      아이디: '', 이름: '', 직위: '', 부서: '', 이메일: '',
+      입사일: new Date().toISOString().slice(0, 10), 상태: 'active', 역할: 'member',
+      오늘의한마디: '', 비밀번호: generateTempPassword(),
+    })
+    setNewPassword('')
+    setLastIssuedPw('')
+    setShowPassword(false)
+    setShowIssuedPassword(false)
+  }
+
+  const handleResetPassword = async () => {
+    if (newPassword.length < 8) return toast.error('비밀번호는 8자 이상이어야 합니다.')
+    if (!confirm(`${editingMember.이름}님의 비밀번호를 새로 설정합니다.\n기존 비밀번호는 즉시 사용할 수 없게 됩니다.`)) return
+
+    setPwSaving(true)
+    try {
+      await adminResetMemberPassword(editingMember.ID, newPassword)
+      setLastIssuedPw(newPassword)
+      setNewPassword('')
+      setShowPassword(false)
+      setShowIssuedPassword(false)
+      toast.success(`${editingMember.이름}님의 비밀번호가 재설정되었습니다.`)
+      onRefresh && onRefresh()
+    } catch (e) {
+      toast.error(e.message || '비밀번호 재설정 실패')
+    } finally {
+      setPwSaving(false)
+    }
   }
 
   const handleSave = async () => {
-    if (!form.이름) return toast.error('이름을 입력하세요.')
+    if (!form.아이디 || !form.이름) return toast.error('아이디와 이름을 입력하세요.')
     try {
-      await adminUpdateMember(editingMember.ID, form, currentUser?.이름)
-      toast.success('팀원 정보가 수정되었습니다.')
+      if (isCreating) {
+        if (form.비밀번호.length < 8) return toast.error('초기 비밀번호는 8자 이상이어야 합니다.')
+        await adminCreateMember(form)
+        toast.success(`${form.이름}님의 로그인 계정과 회원 정보가 생성되었습니다.`)
+      } else {
+        await adminUpdateMember(editingMember.ID, form)
+        toast.success('팀원 정보가 수정되었습니다.')
+      }
       setEditingMember(null)
+      setIsCreating(false)
       onRefresh && onRefresh()
-    } catch (e) { toast.error('수정 실패 (DB 오류)') }
+    } catch (e) { toast.error(e.message || '회원 저장에 실패했습니다.') }
   }
 
   const handleApprove = async (m) => {
     try {
-      await adminApproveMember(m.ID, m.이름, currentUser?.이름)
+      await adminApproveMember(m.ID)
       toast.success(`${m.이름}님의 가입을 승인했습니다.`)
       onRefresh && onRefresh()
     } catch (e) { toast.error('승인 실패') }
@@ -63,7 +122,7 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
     if (m.아이디 === SYS_ADMIN_ID) return toast.error('관리자 계정은 삭제할 수 없습니다.')
     if (!confirm(`${m.이름}님을 팀에서 삭제하시겠습니까?\n삭제 후 해당 계정은 로그인할 수 없습니다.`)) return
     try {
-      await adminDeleteMember(m.ID, m.이름, currentUser?.이름)
+      await adminDeleteMember(m.ID)
       toast.success('팀에서 삭제되었습니다.')
       setEditingMember(null)
       onRefresh && onRefresh()
@@ -80,12 +139,17 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             원가팀 멤버 현황 및 업무 부하를 모니터링합니다. (가입순 정렬)
-            {isAdmin && <span className="ml-2 text-indigo-500 font-bold">· 관리자 모드: 카드의 ⚙ 버튼으로 팀원 정보를 관리하세요.</span>}
+            {isAdmin && <span className="ml-2 text-indigo-500 font-bold">· 관리자 모드: 회원 추가 또는 카드의 관리 버튼에서 계정과 정보를 수정하세요.</span>}
           </p>
         </div>
-        <button onClick={onRefresh} className="btn-secondary">
-          데이터 동기화
-        </button>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+              <UserPlus size={16} /> 회원 추가
+            </button>
+          )}
+          <button onClick={onRefresh} className="btn-secondary">데이터 동기화</button>
+        </div>
       </div>
 
       {/* 멤버 카드 그리드 */}
@@ -108,9 +172,9 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
                 <button
                   onClick={() => openEdit(member)}
                   title="팀원 정보 관리"
-                  className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-600 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10 transition-colors"
+                  className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/50 text-xs font-bold text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 dark:text-slate-400 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10 transition-colors"
                 >
-                  <Settings2 size={18} />
+                  <Settings2 size={14} /> 관리
                 </button>
               )}
 
@@ -148,6 +212,20 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
                 }`}>
                   {isSysAdmin ? 'System Admin' : isPending ? '승인 대기' : member.상태}
                 </div>
+                {isAdmin && member.계정연결 === false && (
+                  <div className="mt-2 w-full rounded-xl border border-red-200 bg-red-50 p-2.5 dark:border-red-500/30 dark:bg-red-500/10">
+                    <div className="flex items-center justify-center gap-1 text-xs font-bold text-red-600 dark:text-red-400">
+                      <Link2Off size={13} /> 로그인 계정 연결 필요
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(member)}
+                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-red-500 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-red-600"
+                    >
+                      <KeyRound size={13} /> 계정 복구
+                    </button>
+                  </div>
+                )}
 
                 {/* 관리자 전용: 승인 대기 멤버 처리 버튼 */}
                 {isAdmin && isPending && (
@@ -209,17 +287,22 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
       </div>
 
       {/* 관리자 전용: 팀원 정보 관리 모달 */}
-      {isAdmin && editingMember && (
+      {isAdmin && (editingMember || isCreating) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md p-6 shadow-2xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-bold dark:text-white flex items-center gap-2">
-                <UserCheck size={20} className="text-indigo-500" /> 팀원 정보 관리
+                {isCreating ? <UserPlus size={20} className="text-indigo-500" /> : <UserCheck size={20} className="text-indigo-500" />}
+                {isCreating ? '새 회원 추가' : '팀원 정보 관리'}
               </h3>
-              <button onClick={() => setEditingMember(null)}><X className="text-slate-400 hover:text-slate-600" /></button>
+              <button onClick={() => { setEditingMember(null); setIsCreating(false) }}><X className="text-slate-400 hover:text-slate-600" /></button>
             </div>
 
             <div className="space-y-3 overflow-y-auto flex-1 p-0.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">로그인 아이디</label>
+                <input autoComplete="off" className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white text-sm font-mono" value={form.아이디} onChange={e => setForm({ ...form, 아이디: e.target.value.toLowerCase() })} placeholder="영문 소문자·숫자 3~32자" />
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">이름</label>
                 <input className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white text-sm" value={form.이름} onChange={e => setForm({ ...form, 이름: e.target.value })} />
@@ -251,20 +334,110 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
                   </select>
                 </div>
               </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">권한</label>
+                <select className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white text-sm" value={form.역할} onChange={e => setForm({ ...form, 역할: e.target.value })}>
+                  <option value="member">일반 회원</option>
+                  <option value="admin">관리자</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">소개 / 메모</label>
+                <textarea className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white text-sm resize-none" rows={2} value={form.오늘의한마디} onChange={e => setForm({ ...form, 오늘의한마디: e.target.value })} />
+              </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                ※ 상태를 '승인 대기'로 바꾸면 해당 팀원은 로그인이 차단됩니다. 아이디: <b>{editingMember.아이디}</b>
+                ※ 상태를 '승인 대기'로 바꾸면 해당 팀원은 로그인이 차단됩니다.
               </p>
+
+              {/* 비밀번호 재설정 */}
+              {isCreating ? (
+                <div className="pt-4 mt-2 border-t border-dashed border-slate-200 dark:border-slate-700 space-y-2">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase"><KeyRound size={13} className="text-amber-500" /> 초기 비밀번호</label>
+                  <div className="flex gap-2">
+                    <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 dark:text-white text-sm font-mono" value={form.비밀번호} onChange={e => setForm({ ...form, 비밀번호: e.target.value })} />
+                    <button type="button" onClick={() => setShowPassword(value => !value)} title={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} className="px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-600">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                    <button type="button" onClick={() => setForm({ ...form, 비밀번호: generateTempPassword() })} className="px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-600"><Shuffle size={16} /></button>
+                    <button type="button" onClick={() => { navigator.clipboard?.writeText(form.비밀번호); toast.success('초기 비밀번호를 복사했습니다.') }} title="비밀번호 복사" className="px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-600"><Copy size={16} /></button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">저장 전 복사해 안전한 채널로 전달하세요. 저장 후에는 다시 조회할 수 없습니다.</p>
+                </div>
+              ) : <div className="pt-4 mt-2 border-t border-dashed border-slate-200 dark:border-slate-700 space-y-2">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                  <KeyRound size={13} className="text-amber-500" /> 비밀번호 재설정
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 dark:text-white text-sm font-mono"
+                    placeholder="새 비밀번호 (8자 이상)"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(value => !value)}
+                    title={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+                    className="px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-600 hover:border-amber-300 dark:hover:text-amber-400 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewPassword(generateTempPassword())}
+                    title="임시 비밀번호 자동 생성"
+                    className="px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-600 hover:border-amber-300 dark:hover:text-amber-400 transition-colors"
+                  >
+                    <Shuffle size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    disabled={pwSaving || newPassword.length < 8}
+                    className="px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {pwSaving ? '적용 중...' : '적용'}
+                  </button>
+                </div>
+
+                {lastIssuedPw && (
+                  <div className="flex items-center justify-between gap-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase">발급된 새 비밀번호</p>
+                      <p className="font-mono text-sm text-amber-900 dark:text-amber-200 truncate">{showIssuedPassword ? lastIssuedPw : '••••••••'}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button type="button" onClick={() => setShowIssuedPassword(value => !value)} className="text-amber-700 dark:text-amber-400" title={showIssuedPassword ? '숨기기' : '보기'}>{showIssuedPassword ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(lastIssuedPw)
+                          toast.success('복사했습니다. 창을 닫으면 다시 볼 수 없습니다.')
+                        }}
+                        className="flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline"
+                      >
+                        <Copy size={13} /> 복사
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  ※ 비밀번호는 암호화되어 저장되므로 <b>기존 비밀번호는 조회할 수 없습니다.</b> 팀원이 잊었다면 여기서 새로 정해 알려주세요.
+                  본인은 로그인 후 <b>내 상태 설정</b>에서 직접 변경할 수 있습니다.
+                </p>
+              </div>}
             </div>
 
             <div className="flex justify-between items-center mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
-              {editingMember.아이디 !== SYS_ADMIN_ID ? (
+              {!isCreating && editingMember?.아이디 !== SYS_ADMIN_ID ? (
                 <button onClick={() => handleDelete(editingMember)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 px-3 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
                   <Trash2 size={15} /> 팀에서 삭제
                 </button>
               ) : <div />}
               <div className="flex gap-2">
-                <button onClick={() => setEditingMember(null)} className="btn-secondary">취소</button>
-                <button onClick={handleSave} className="btn-primary">저장</button>
+                <button onClick={() => { setEditingMember(null); setIsCreating(false) }} className="btn-secondary">취소</button>
+                <button onClick={handleSave} className="btn-primary">{isCreating ? '계정 생성' : '저장'}</button>
               </div>
             </div>
           </div>
