@@ -289,6 +289,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     try {
       await createComment({
         postID: selectedTask.ID, 
+        entityType: 'task',
         content: comment,
         authorName: currentUserName
       })

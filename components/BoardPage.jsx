@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { X, Image as ImageIcon, Search, MessageSquare, Trash2, Edit2 } from 'lucide-react'
 import { createPost, createComment, deletePost, updatePost, deleteComment } from '@/lib/sheets'
+import { uploadWorkspaceFile } from '@/lib/work-os'
 
 export default function BoardPage({ posts, currentUser, onRefresh }) {
   const [filter, setFilter] = useState('전체')
@@ -39,7 +40,7 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
 
   const handleFileChange = (e) => {
     const file = e.target.files[0]
-    if (file) { setNewPost({ ...newPost, 첨부파일: file.name }) }
+    if (file) { setNewPost({ ...newPost, 첨부파일: file }) }
   }
 
   const handleSave = async () => {
@@ -49,9 +50,11 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     try {
       if (isEditMode && selectedPost) {
         await updatePost(selectedPost.ID, newPost, currentUser?.이름)
+        if (newPost.첨부파일) await uploadWorkspaceFile(newPost.첨부파일, { entityType: 'post', entityId: selectedPost.ID })
         toast.success('게시글이 수정되었습니다!')
       } else {
-        await createPost({ ...newPost, 작성자명: currentUser?.이름 || '익명' })
+        const created = await createPost({ ...newPost, 작성자명: currentUser?.이름 || '익명' })
+        if (newPost.첨부파일) await uploadWorkspaceFile(newPost.첨부파일, { entityType: 'post', entityId: created.id })
         toast.success('게시글 등록 완료!')
       }
       
@@ -60,7 +63,7 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
       setIsEditMode(false)
       if (onRefresh) onRefresh()
     } catch (error) {
-      toast.error('처리 실패')
+      toast.error(error.message || '처리 실패')
     }
   }
 
@@ -94,6 +97,7 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
     try {
       await createComment({
         postID: selectedPost.ID,
+        entityType: 'post',
         content: commentInput,
         authorName: currentUser?.이름 || '익명'
       })
@@ -225,7 +229,7 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
               <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">제목 <span className="text-red-500">*</span></label><input type="text" value={newPost.제목} onChange={(e) => setNewPost({...newPost, 제목: e.target.value})} className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-transparent focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all dark:text-white" placeholder="제목을 입력하세요" autoFocus /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">카테고리</label><select value={newPost.태그} onChange={(e) => setNewPost({...newPost, 태그: e.target.value})} className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-transparent focus:border-indigo-500 outline-none dark:text-white appearance-none"><option>일반</option><option>이슈</option><option>공지</option><option>긴급</option><option>자료</option></select></div>
-                <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">첨부파일</label><label className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 text-gray-500 text-sm flex items-center justify-between gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"><span className="truncate">{newPost.첨부파일 ? newPost.첨부파일 : '클릭하여 파일 업로드'}</span><ImageIcon size={18} className="opacity-50"/><input type="file" className="hidden" onChange={handleFileChange} /></label></div>
+                <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">첨부파일</label><label className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 text-gray-500 text-sm flex items-center justify-between gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"><span className="truncate">{newPost.첨부파일 ? newPost.첨부파일.name : '클릭하여 파일 업로드'}</span><ImageIcon size={18} className="opacity-50"/><input type="file" className="hidden" onChange={handleFileChange} /></label></div>
               </div>
               <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">내용 <span className="text-red-500">*</span></label><textarea value={newPost.내용} onChange={(e) => setNewPost({...newPost, 내용: e.target.value})} className="w-full h-40 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-transparent focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none transition-all dark:text-white" placeholder="내용을 입력하세요..." /></div>
             </div>

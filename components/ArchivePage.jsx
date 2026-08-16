@@ -66,7 +66,7 @@ export default function ArchivePage({ archives = [], currentUser, onRefresh }) {
   const handleAddComment = async () => {
     if (!commentInput.trim()) return
     try {
-      await createComment({ postID: selectedDoc.ID, content: commentInput, authorName: currentUser?.이름 || '익명' })
+      await createComment({ postID: selectedDoc.ID, entityType: 'archive', content: commentInput, authorName: currentUser?.이름 || '익명' })
       toast.success('댓글 등록 완료')
       setCommentInput('')
       if (onRefresh) onRefresh()

@@ -3,20 +3,28 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, Bell, Settings, Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import SettingsModal from './SettingsModal' // ✅ [추가] 모달 import
+import { getUnreadNotificationCount } from '@/lib/work-os'
 
 export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
   const [isDark, setIsDark] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const [searchValue, setSearchValue] = useState('')
+  const [unreadCount, setUnreadCount] = useState(0)
   
   // ✅ [추가] 설정 모달 상태 관리
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   // URL에서 초기 검색어 가져오기
   useEffect(() => {
-    setSearchValue(searchParams.get('search') || '')
+    setSearchValue(searchParams.get('q') || searchParams.get('search') || '')
   }, [searchParams])
+
+  useEffect(() => {
+    let active = true
+    getUnreadNotificationCount().then(count => { if (active) setUnreadCount(count) })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     if (localStorage.getItem('theme') === 'dark' || 
@@ -41,17 +49,15 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
     }
   }
 
-  // URL 쿼리 업데이트
+  // 검색어는 입력 중 서버 호출하지 않고 Enter 시 통합검색으로 이동한다.
   const handleSearch = (e) => {
-    const value = e.target.value
-    setSearchValue(value)
-    
-    // URL 업데이트 (페이지 이동 없음, 쿼리만 변경)
-    if (value) {
-      router.push(`?search=${value}`)
-    } else {
-      router.push('?') // 검색어 삭제 시 쿼리 제거 (현재 페이지 유지)
-    }
+    setSearchValue(e.target.value)
+  }
+
+  const submitSearch = (e) => {
+    e.preventDefault()
+    if (!searchValue.trim()) return
+    router.push(`/work?tab=search&q=${encodeURIComponent(searchValue.trim())}`)
   }
 
   return (
@@ -72,20 +78,21 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
             <span>원가팀</span>
           </div>
 
-          <div className="flex-1 max-w-md mx-4 lg:mx-8">
+          <form onSubmit={submitSearch} className="flex-1 max-w-md mx-4 lg:mx-8" role="search">
             <div className="relative group">
               <input
                 type="text"
                 value={searchValue}
                 onChange={handleSearch}
-                placeholder="검색 (업무, 게시글, 아카이브)..."
+                placeholder="통합검색 후 Enter"
+                aria-label="업무, 프로젝트, 게시글, 아카이브 통합검색"
                 className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm 
                            focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 
                            focus:outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500 dark:text-white"
               />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-500" size={16} />
             </div>
-          </div>
+          </form>
 
           <div className="flex items-center gap-2">
             <button 
@@ -95,9 +102,9 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-            <button className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors relative">
+            <button onClick={() => router.push('/work?tab=notifications')} aria-label={`알림 ${unreadCount}개`} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors relative">
               <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+              {unreadCount > 0 && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-5 text-white">{unreadCount > 99 ? '99+' : unreadCount}</span>}
             </button>
             
             {/* ✅ [수정] 설정 버튼에 클릭 이벤트 추가 */}

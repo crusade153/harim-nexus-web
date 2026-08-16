@@ -11,7 +11,7 @@ export default function MembersRoutePage() {
   const loadData = async () => {
     setLoading(true)
     // ✅ 실제 DB 데이터 로드
-    const dbData = await getRealData()
+    const dbData = await getRealData({ sections: ['members', 'tasks', 'projects'] })
     if (dbData.currentUser?.역할 === 'admin' || dbData.currentUser?.아이디 === 'crusade153') {
       try {
         dbData.members = await adminGetMembers()

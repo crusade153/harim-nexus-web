@@ -15,7 +15,7 @@ function DashboardContent() {
   const loadData = async () => {
     setLoading(true)
     // ✅ 실제 DB 데이터 가져오기
-    const dbData = await getRealData()
+    const dbData = await getRealData({ sections: ['tasks', 'members', 'quickLinks', 'activities'] })
     setData(dbData)
     setLoading(false)
   }

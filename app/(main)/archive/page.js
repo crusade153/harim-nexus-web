@@ -14,7 +14,7 @@ function ArchiveContent() {
   const [isInitialLoading, setIsInitialLoading] = useState(true)
 
   const loadData = async () => {
-    const dbData = await getRealData()
+    const dbData = await getRealData({ sections: ['archives'] })
     setData(dbData)
     setIsInitialLoading(false)
   }

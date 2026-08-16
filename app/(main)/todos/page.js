@@ -12,7 +12,7 @@ function TodosContent() {
   const [isInitialLoading, setIsInitialLoading] = useState(true)
 
   const loadData = async () => {
-    const dbData = await getRealData()
+    const dbData = await getRealData({ sections: ['projects', 'tasks'] })
     setData(dbData)
     setIsInitialLoading(false)
   }

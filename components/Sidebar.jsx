@@ -16,7 +16,8 @@ import {
   GanttChartSquare,
   FileBarChart2,
   PanelLeftClose,
-  Network
+  Network,
+  BriefcaseBusiness
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
@@ -30,6 +31,7 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
 
   const menuItems = [
     { id: 'dashboard', name: '대시보드', icon: LayoutDashboard, path: '/dashboard' },
+    { id: 'work', name: '업무 허브', icon: BriefcaseBusiness, badge: 'My Work', path: '/work' },
     { id: 'kanban', name: '업무 보드', icon: KanbanSquare, path: '/kanban' }, 
     // ✅ [수정됨] 이름: 프로젝트 WBS / 배지: Schedule
     { id: 'timeline', name: '프로젝트 WBS', icon: GanttChartSquare, badge: 'Schedule', path: '/timeline' },

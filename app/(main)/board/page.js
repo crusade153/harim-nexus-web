@@ -14,7 +14,7 @@ function BoardContent() {
   const loadData = async () => {
     setLoading(true)
     // ✅ 여기 수정됨! (가짜 데이터 대신 진짜 DB 데이터 가져오기)
-    const dbData = await getRealData() 
+    const dbData = await getRealData({ sections: ['posts'] })
     setData(dbData)
     setLoading(false)
   }

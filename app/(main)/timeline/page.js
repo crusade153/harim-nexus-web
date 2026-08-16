@@ -131,7 +131,7 @@ export default function TimelinePage() {
   const [areWbsToolsCollapsed, setAreWbsToolsCollapsed] = useState(false)
 
   const loadProjects = async () => {
-    const data = await getRealData()
+    const data = await getRealData({ sections: ['projects', 'tasks', 'members'] })
     setProjects(data.projects || [])
     setAllTasks(data.tasks || [])
     setMembers(data.members || [])

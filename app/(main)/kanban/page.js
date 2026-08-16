@@ -14,7 +14,7 @@ function KanbanContent() {
   const [isInitialLoading, setIsInitialLoading] = useState(true)
 
   const loadData = async () => {
-    const dbData = await getRealData() 
+    const dbData = await getRealData({ sections: ['tasks', 'archives'] })
     setData(dbData)
     setIsInitialLoading(false)
   }

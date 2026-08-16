@@ -13,7 +13,7 @@ export default function ReportPage() {
 
   const loadData = async () => {
     setLoading(true)
-    const dbData = await getRealData()
+    const dbData = await getRealData({ sections: ['members', 'tasks', 'projects'] })
     setData(dbData)
     setLoading(false)
   }
