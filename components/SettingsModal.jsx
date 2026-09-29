@@ -5,6 +5,7 @@ import { updateMyProfile, changeMyPassword } from '@/lib/sheets'
 import { X, Save, Smile, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { isValidPin, PIN_RULE_MESSAGE } from '@/lib/auth-id'
+import CalendarSubscription from './CalendarSubscription'
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false)
@@ -83,7 +84,7 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm shadow-2xl relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
         {/* 헤더 */}
         <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
           <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -95,7 +96,7 @@ export default function SettingsModal({ isOpen, onClose }) {
         </div>
 
         {/* 바디 */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto">
           {/* 1. 상태 선택 */}
           <div className="space-y-3">
             <label className="text-xs font-bold text-slate-500 uppercase">현재 상태</label>
@@ -164,6 +165,9 @@ export default function SettingsModal({ isOpen, onClose }) {
               ※ 임시 비밀번호를 받으셨다면 여기서 본인만 아는 비밀번호로 바꿔주세요.
             </p>
           </div>
+
+          {/* 4. 구글 캘린더 구독 */}
+          <CalendarSubscription />
         </div>
 
         {/* 푸터 */}

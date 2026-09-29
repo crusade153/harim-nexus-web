@@ -3,6 +3,7 @@ import { requireNexusMember, WORKSPACE_ID, checked, apiError } from '@/lib/nexus
 import { runDeepSeek } from '@/lib/ai/deepseek'
 import { reviewMessages } from '@/lib/ai/prompts'
 import { tokenReservation } from '@/lib/ai/review-utils.mjs'
+import { flushChatNotifications } from '@/lib/google-chat'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,7 +40,11 @@ export async function POST(request) {
     const transition = await admin.rpc('nexus_ai_transition', { p_id: body.id, p_member: identity.member.id, p_action: body.action, p_answers: body.answers || null })
     if (transition.error?.code === 'P0001') throw Object.assign(new Error(transition.error.message), { status: 409 })
     review = checked(transition)
-    if (body.action === 'confirm') return NextResponse.json({ confirmed: true })
+    if (body.action === 'confirm') {
+      // 확인된 고위험 요약은 관리자 알림(system)이 생기므로 Chat 으로도 바로 보낸다
+      if (review.risk_level === 'high') await flushChatNotifications(admin).catch(() => null)
+      return NextResponse.json({ confirmed: true })
+    }
     const settings = checked(await admin.from('workspace_settings').select('ai_enabled,ai_guidelines,ai_mask_numbers').eq('workspace_id', WORKSPACE_ID).single())
     if (!settings.ai_enabled) throw new Error('관리자가 AI 외부 전송을 활성화해야 합니다.')
     const messages = checked(await admin.from('ai_review_messages').select('role,content').eq('review_id', review.id).order('id').limit(20))

@@ -103,11 +103,21 @@
 - 팀장 할 일 (남음): Vercel 환경변수(`DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL=deepseek-v4-pro`, `DEEPSEEK_BASE_URL`) → `/ai` 운영 설정에서 지침 작성 → 회사 보안 정책 확인 후 외부 전송 켜기(현재 **꺼짐**) → 대리 관리자 지정.
 - 커밋·푸시 완료 (2026-09-29). 배포는 Vercel 자동 배포 여부·환경변수 확인 필요.
 
-### ② P2 — 월마감 + Google Workspace 연동
-- `/closing`: `task_templates`(checklist·recurrence_rule 이미 있음) 를 마감 템플릿으로, `closing_runs` 로 매월 업무 자동 생성·배정. 영업일 계산 `addBusinessDays` + 테스트
-- Google Chat 팀 스페이스 Incoming Webhook(`GOOGLE_CHAT_WEBHOOK_URL`, 서버 env) — 즉시 알림(멘션·배정·보고 제출) + 평일 아침 브리핑 + 금요일 주간보고 리마인드 (Vercel Cron, `CRON_SECRET`). 개인 멘션 형식은 실제 스페이스에서 검증 필요
-- 구글 캘린더 구독(ICS): `app/api/calendar/[token]` (개인 토큰)
-- 알림 실시간화: `alter publication supabase_realtime add table harim_nexus.notifications` 후 헤더 구독 (지금은 1분 폴링)
+### ② P2 — 월마감 + Google Workspace 연동 (완료·운영 적용·실제 검증, 2026-09-29)
+- 적용 안내·동작 규칙: `supabase/bootstrap/P2.md`. DB: `03_p2_closing_chat.sql` **운영 적용 완료(팀장, 2026-09-29)**. Vercel 환경변수(GOOGLE_CHAT_WEBHOOK_URL·NEXT_PUBLIC_APP_URL=https://team.zettai.co.kr·CRON_SECRET) 설정 완료
+- `/closing` (업무 > 월마감 탭): 진행률·지연·항목 체크·지난달 몇 영업일째 완료 비교. 관리자: 새 월마감 시작(미리보기), 템플릿 관리(D+영업일·기본 담당·참고 링크·자동 시작), 공휴일, Google Chat 설정·연결 테스트·브리핑 지금 보내기
+- 서버: `app/api/closing`, `lib/closing-server.js`(실행 생성 RPC 1회로 원자적), `lib/closing-utils.mjs`(영업일 계산, 테스트)
+- Google Chat: `lib/google-chat.js`(웹훅은 `chat.googleapis.com` 만 허용), `lib/chat-utils.mjs`(문구), 즉시 전송 `app/api/notify/flush` ← `lib/chat-client.js` `requestChatFlush()` (업무 생성·담당 변경·멘션 저장 후 1.5초 디바운스), 고위험 AI 확인 시 서버에서 전송
+- 크론 `app/api/cron/daily` (vercel.json 23:40 UTC = 08:40 KST, 1개로 통합): 일시정지 방지 + 영업일이면 월마감 자동 시작·밀린 알림·아침 브리핑(하루 1회). `CRON_SECRET` 없으면 조회만. 옛 `api/cron/keepalive` 삭제
+- 캘린더 구독: `app/api/calendar/token`(발급·재발급), `app/api/calendar/[token]`(ICS, `lib/ics.mjs`), 설정 모달 `components/CalendarSubscription.jsx`
+- 헤더 알림 Realtime 구독 (+1분 폴링 유지)
+- 환경변수 추가: `GOOGLE_CHAT_WEBHOOK_URL`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`
+- 검증: 단위 테스트 20개, `scripts/check-p2-db.mjs`(PGlite) 5개 묶음, 빌드.
+- **운영 DB E2E (임시 계정 zztest06~08, 끝나고 삭제, Chat 설정 원복)**: 팀원 조회만·저장 403 / 템플릿 저장·같은 이름 409·영업일 범위 400 / 월마감 시작(업무 2건, D+0·D+2 영업일)·중복 409 / 배정 알림 Chat 1회 전송·재호출 0건 / 체크 → 진행률·AI 대기(closing_item) / 캘린더 발급·ICS(내 미완료만, 배포 주소 링크)·재발급 시 예전 주소 404 / 크론 비밀값 없으면 401, 브리핑 하루 1회 / 관리자 화면 표시.
+  실제 Chat 스페이스로 테스트 메시지 4건 전송됨(연결 테스트 1, 배정 1, 브리핑 2 — 아래 캐시 버그로 브리핑 1건 중복).
+- **검증 중 고친 버그 (중요)**: Next.js 14 가 서버 fetch(POST 포함)를 캐시해 Supabase 조회·RPC 결과가 재사용됨 → 재발급한 캘린더 옛 주소가 계속 통하고 브리핑 "오늘 이미 보냄"이 무시됨. `lib/supabase-admin.js` 에 `cache: 'no-store'` fetch 지정으로 모든 서버 라우트 해결 (P1 주간보고·AI API 도 같은 클라이언트라 함께 보호). **서버에서 Supabase 클라이언트를 새로 만들 때 반드시 getAdminClient() 를 쓸 것**
+- 운영 상태: Chat 알림 **꺼짐**(관리자가 /closing > Google Chat 알림에서 켜야 함), 템플릿 0개, 공휴일 기본 16일
+- 팀장 할 일: 템플릿 등록(자동 시작 여부) → 공휴일 확인 → Chat 알림 켜기(선택: 이메일 멘션 — 실제 멘션 동작 확인 필요)
 
 ### ③ P3 — 원가 데이터 연동 (API 확보 후)
 일일원가·재료비 차이·S&OP 재고·자재 수급 대시보드의 서버 API 를 캐시해 홈·월마감에 "원가 신호" 표시 → "업무로 만들기"(`source='signal'`, 중복 방지). 수치는 원 시스템 값·기준시각 그대로 인용. **각 대시보드 HTTP 엔드포인트·인증 방식 확인 전에는 착수 보류**
@@ -137,6 +147,6 @@
 
 ```
 HANDOVER.md 를 읽고 이어서 작업해줘.
-다음 작업은 "4-② P2 (월마감 + Google Chat 연동)" 야.
+다음 작업은 "4-③ P3 원가 데이터 연동" 이야. (각 대시보드 API 엔드포인트·인증 방식부터 확인)
 DB 변경은 supabase/bootstrap/02_*.sql 로 만들고, 적용은 내가 SQL Editor 에서 할게.
 ```

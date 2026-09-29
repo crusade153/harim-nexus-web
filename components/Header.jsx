@@ -5,6 +5,9 @@ import { Search, Bell, Settings, Moon, Sun, PanelLeftClose, PanelLeftOpen } from
 import SettingsModal from './SettingsModal' // ✅ [추가] 모달 import
 import { getUnreadNotificationCount } from '@/lib/work-os'
 import QuickAdd from './QuickAdd'
+import toast from 'react-hot-toast'
+import { supabase } from '@/lib/supabase'
+import { NEXUS_DB_SCHEMA } from '@/lib/db-config'
 
 export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
   const [isDark, setIsDark] = useState(false)
@@ -37,6 +40,29 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
       window.clearInterval(timer)
       window.removeEventListener('focus', refresh)
       document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
+
+  // 새 알림 실시간 수신 (Supabase Realtime, RLS 적용). 연결이 끊겨도 위의 1분 갱신이 보완한다.
+  useEffect(() => {
+    let channel = null
+    let cancelled = false
+    const subscribe = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      const { data: member } = await supabase.from('members').select('id').eq('auth_id', user.id).maybeSingle()
+      if (!member || cancelled) return
+      channel = supabase.channel(`notifications-${member.id}`)
+        .on('postgres_changes', { event: 'INSERT', schema: NEXUS_DB_SCHEMA, table: 'notifications', filter: `recipient_member_id=eq.${member.id}` }, payload => {
+          setUnreadCount(count => count + 1)
+          if (payload.new?.title) toast(payload.new.title, { icon: '🔔' })
+        })
+        .subscribe()
+    }
+    subscribe()
+    return () => {
+      cancelled = true
+      if (channel) supabase.removeChannel(channel)
     }
   }, [])
 
