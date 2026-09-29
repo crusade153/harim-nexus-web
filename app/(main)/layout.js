@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import SectionTabs from '@/components/SectionTabs'
+import CompletionCheckHost from '@/components/CompletionCheck'
 import { supabase } from '@/lib/supabase'
 
 export default function MainLayout({ children }) {
@@ -60,6 +61,7 @@ export default function MainLayout({ children }) {
           {children}
         </div>
       </main>
+      <CompletionCheckHost />
     </div>
   )
 }

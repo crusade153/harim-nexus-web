@@ -39,7 +39,8 @@ export default function TodoListPage({ projects = [], currentUser, onRefresh }) 
         await toggleTaskStatus(taskId, currentIsDone); 
         if (onRefresh) onRefresh() 
     } catch (error) { 
-        toast.error('상태 변경 실패')
+        if (error.cancelled) toast(error.message)
+        else toast.error(error.message || '상태 변경 실패')
         setLocalProjects(projects) // 롤백
     }
   }

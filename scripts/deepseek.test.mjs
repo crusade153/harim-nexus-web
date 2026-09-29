@@ -50,3 +50,8 @@ test('제공자 HTTP 오류는 자동 재시도하지 않고 예약 유지', asy
   assert.equal(calls, 1)
   assert.equal(settles, 0)
 }))
+test('검증 함수를 넘기면 그 형식으로 검증 (완료 점검 질문)', async () => withProvider(async () => {
+  globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ questions: ['대사하셨나요?'] }) } }], usage: { prompt_tokens: 5, completion_tokens: 5 } })
+  const result = await runDeepSeek(input, value => ({ questions: value.questions }), { reserve: async () => 1, settle: async () => {} })
+  assert.deepEqual(result, { questions: ['대사하셨나요?'], model: 'fake-model' })
+}))

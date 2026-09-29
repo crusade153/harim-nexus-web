@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, CalendarCheck2, CheckCircle2, Circle, Loader2, Mess
 import { supabase } from '@/lib/supabase'
 import { nexusApi } from '@/lib/nexus-api'
 import { entityUrl, TASKS_CHANGED_EVENT } from '@/lib/links'
+import { completeWithCheck } from '@/lib/completion-gate'
 import { requestChatFlush } from '@/lib/chat-client'
 import { businessDaysBetween, buildClosingTasks, closingProgress, defaultRunStart, isValidPeriod } from '@/lib/closing-utils.mjs'
 import { seoulDate } from '@/lib/weekly-utils.mjs'
@@ -80,11 +81,16 @@ function RunView({ data, templateName, onChanged }) {
 
   const toggle = async task => {
     setBusyId(task.id)
-    const { error } = await supabase.from('tasks').update({ status: task.status === '완료' ? '대기' : '완료' }).eq('id', task.id)
-    setBusyId(null)
-    if (error) return toast.error(error.message)
-    requestChatFlush()
-    onChanged()
+    try {
+      // 완료는 AI 친구 점검 창을 거친다. 되돌리기(대기)는 바로 저장
+      if (task.status === '완료') {
+        const { error } = await supabase.from('tasks').update({ status: '대기' }).eq('id', task.id)
+        if (error) throw error
+      } else await completeWithCheck(task.id)
+      requestChatFlush()
+      onChanged()
+    } catch (e) { e.cancelled ? toast(e.message) : toast.error(e.message) }
+    finally { setBusyId(null) }
   }
   const setRunStatus = async action => {
     try { await nexusApi('/api/closing', { action, run_id: run.id }); toast.success(action === 'close_run' ? '마감 완료로 표시했습니다.' : '다시 열었습니다.'); onChanged() }

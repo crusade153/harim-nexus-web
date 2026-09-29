@@ -51,7 +51,7 @@ export default function WeeklyReport() {
     try {
       const result = await nexusApi('/api/weekly', { action, week, content, version: data.report?.updated_at || null })
       setData(old => ({ ...old, report: result.report })); setDirty(false)
-      toast.success(action === 'submit' ? '보고서를 제출했습니다. AI 확인은 AI 팀장에서 이어갈 수 있습니다.' : '초안을 저장했습니다.')
+      toast.success(action === 'submit' ? '보고서를 제출했습니다. AI 정리는 AI 친구에서 이어갈 수 있습니다.' : '초안을 저장했습니다.')
     } catch (e) { toast.error(e.message) } finally { setBusy(false) }
   }
   return <div className="mx-auto max-w-6xl space-y-6">

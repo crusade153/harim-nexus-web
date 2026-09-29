@@ -264,7 +264,7 @@ export default function TimelinePage() {
       toast.success(currentIsDone ? '진행중으로 변경' : '완료 처리되었습니다')
       loadProjects()
       refreshTasks()
-    } catch (e) { toast.error('상태 변경 실패') }
+    } catch (e) { e.cancelled ? toast(e.message) : toast.error(e.message || '상태 변경 실패') }
   }
 
   const handleSaveTask = async () => {
@@ -339,7 +339,7 @@ export default function TimelinePage() {
       loadProjects()
       refreshTasks()
     } catch (e) {
-      toast.error('일괄 수정 실패')
+      toast.error(e.message || '일괄 수정 실패')
     }
   }
 

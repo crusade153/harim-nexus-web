@@ -172,7 +172,11 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
   const activeItem = useMemo(() => items.find((i) => i.ID === activeId), [activeId, items])
 
   // --- 드래그 핸들러 ---
-  const handleDragStart = (event) => setActiveId(event.active.id)
+  const [dragFromStatus, setDragFromStatus] = useState(null)
+  const handleDragStart = (event) => {
+    setActiveId(event.active.id)
+    setDragFromStatus(items.find(i => i.ID === event.active.id)?.상태 ?? null)
+  }
   
   const handleDragOver = (event) => {
     const { active, over } = event
@@ -189,7 +193,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
       if (items[activeIndex].상태 !== items[overIndex].상태) {
         setItems((items) => {
           const newItems = [...items]
-          newItems[activeIndex].상태 = items[overIndex].상태
+          newItems[activeIndex] = { ...newItems[activeIndex], 상태: items[overIndex].상태 }
           return arrayMove(newItems, activeIndex, overIndex - 1)
         })
       } else {
@@ -210,12 +214,14 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
     if (items.find(i => i.ID === over.id)) {
        newStatus = items.find(i => i.ID === over.id).상태
     }
+    // 같은 열 안에서 순서만 바꾼 경우는 저장할 것이 없다
+    if (dragFromStatus === newStatus) return
     try {
       await updateTaskStatus(active.id, newStatus) 
-      toast.success(`'${newStatus}' 상태로 이동됨`)
+      if (newStatus !== '완료') toast.success(`'${newStatus}' 상태로 이동됨`)
     } catch (error) {
-      console.error(error)
-      toast.error('저장 실패 (DB 오류)')
+      if (error.cancelled) toast(error.message)
+      else toast.error(error.message || '저장 실패 (DB 오류)')
       if (onRefresh) onRefresh() 
     }
   }
@@ -224,14 +230,20 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
 
   const handleStatusChange = async (newStatus) => {
     if (!selectedTask) return
-    const updatedItems = items.map(item => item.ID === selectedTask.ID ? { ...item, 상태: newStatus } : item)
-    setItems(updatedItems)
-    setSelectedTask({ ...selectedTask, 상태: newStatus })
+    const taskId = selectedTask.ID
+    const apply = () => {
+      setItems(old => old.map(item => item.ID === taskId ? { ...item, 상태: newStatus } : item))
+      setSelectedTask(old => old?.ID === taskId ? { ...old, 상태: newStatus } : old)
+    }
+    // 완료는 AI 친구 점검 창에서 답변을 제출한 뒤에만 반영한다
+    if (newStatus !== '완료') apply()
     try {
-        await updateTaskStatus(selectedTask.ID, newStatus)
-        toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
+        await updateTaskStatus(taskId, newStatus)
+        if (newStatus === '완료') apply()
+        else toast.success(`상태가 '${newStatus}'(으)로 변경되었습니다.`)
     } catch (error) {
-        toast.error('상태 변경 실패')
+        if (error.cancelled) toast(error.message)
+        else toast.error(error.message || '상태 변경 실패')
         if (onRefresh) onRefresh()
     }
   }
@@ -392,6 +404,11 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                         >
                             {columns.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
+                        {selectedTask.상태 !== '완료' && (
+                          <button onClick={() => handleStatusChange('완료')} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700" title="AI 친구의 점검 질문에 답하고 완료합니다">
+                            <CheckCircle2 size={14} /> 완료하기
+                          </button>
+                        )}
                         <span className="text-xs text-slate-400">ID: #{selectedTask.ID}</span>
                     </div>
                     <input 
