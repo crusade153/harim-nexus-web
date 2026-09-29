@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Bot, Copy, Eraser, ListChecks, Loader2, NotebookPen, Send } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { nexusApi } from '@/lib/nexus-api'
@@ -19,9 +20,11 @@ const PRESETS = [
   ['전주 실적만', '전주 실적만 회의자료 양식으로 정리해 줘. 결과·산출물 위주로.'],
   ['금주 계획만', '금주 계획을 회의자료 양식으로 정리해 줘. 마감일이 있으면 함께 적어 줘.'],
   ['이번 주 3줄 요약', '이번 주에 한 일을 팀장님께 말로 보고하듯 3줄로 요약해 줘.'],
+  ['이슈 리포트', '이번 주 기록에서 이슈나 협조 요청을 사실·영향·필요한 지원으로 짧게 정리해 줘. 없는 정보는 확인 필요로 표시해 줘.'],
 ]
 
 export default function DeskPage() {
+  const router = useRouter()
   const [base, setBase] = useState(() => seoulDate())
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -128,6 +131,14 @@ export default function DeskPage() {
   const copy = async value => {
     try { await navigator.clipboard.writeText(value); toast.success('복사했어요. 회의자료에 붙여 넣으세요.') } catch { toast.error('복사하지 못했어요. 직접 선택해 복사해 주세요.') }
   }
+  const sendToWeekly = value => {
+    sessionStorage.setItem(`nexus_weekly_suggestion_${data.memberId}_${data.week.start}`, value.slice(0, 12000))
+    router.push(`/weekly?week=${data.week.start}`)
+  }
+  const sendToIssue = value => {
+    sessionStorage.setItem(`nexus_issue_draft_${data.memberId}`, value.slice(0, 12000))
+    router.push('/board?new=issue')
+  }
 
   if (error) return <div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">{error}<button className="btn-secondary ml-3" onClick={() => load(base)}>다시 불러오기</button></div>
   if (!data) return <p className="p-8 text-slate-500">작업공간을 불러오는 중…</p>
@@ -141,7 +152,8 @@ export default function DeskPage() {
         <h1 className="mt-2 flex items-center gap-2 text-3xl font-bold dark:text-white"><NotebookPen className="text-indigo-500" /> 내 작업공간</h1>
         <p className="mt-2 text-sm text-slate-500">하루 한 일을 편하게 적어 두면, 비서몬이 전주 실적·금주 계획 회의자료로 정리해 줘요.</p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href="/board?new=issue" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100">이슈 바로 공유</Link>
         <button className="btn-secondary" onClick={() => moveWeek(-7)} disabled={saving || thinking}>← 이전 주</button>
         <span className="min-w-36 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">금주 {short(data.week.start)}~{short(data.week.end)}</span>
         <button className="btn-secondary" onClick={() => moveWeek(7)} disabled={saving || thinking || isThisWeek}>다음 주 →</button>
@@ -189,6 +201,7 @@ export default function DeskPage() {
         {!assistant.ready && <p className="mx-5 mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{!assistant.configured ? '서버의 비서몬 연결 설정이 필요합니다.' : '관리자가 비서몬 외부 전송을 켜면 대화할 수 있어요.'} 일일 기록은 지금도 저장됩니다.</p>}
         <div ref={listRef} className="max-h-[60vh] min-h-72 flex-1 space-y-3 overflow-y-auto px-5 py-4">
           {messages.length === 0 && !thinking && <div className="py-6 text-center text-sm leading-6 text-slate-500">
+            <img src="/nexus-mascot-notes.webp" alt="업무 기록을 돕는 비서몬" className="mx-auto mb-2 h-44 w-44 object-contain" />
             <p>전주·금주 기록과 업무를 보고 회의자료를 만들어 드려요.</p>
             <p>아래 버튼을 누르거나, &quot;구매팀 협조 건은 이슈로 빼 줘&quot;처럼 편하게 말해 주세요.</p>
           </div>}
@@ -196,7 +209,7 @@ export default function DeskPage() {
             ? <div key={i} className="ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-indigo-600 px-4 py-2.5 text-sm text-white">{m.content}</div>
             : <div key={i} className="max-w-[95%] rounded-2xl rounded-bl-sm bg-slate-50 px-4 py-3 dark:bg-slate-800">
               <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-800 dark:text-slate-100">{m.content}</p>
-              <button onClick={() => copy(m.content)} className="mt-2 flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-300"><Copy size={13} /> 복사</button>
+              <div className="mt-2 flex flex-wrap gap-3"><button onClick={() => copy(m.content)} className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-300"><Copy size={13} /> 복사</button><button onClick={() => sendToWeekly(m.content)} className="text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-300">주간보고에 반영 →</button><button onClick={() => sendToIssue(m.content)} className="text-xs font-semibold text-amber-700 hover:underline">팀에 이슈 공유 →</button></div>
             </div>)}
           {thinking && <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin text-indigo-500" /> 비서몬이 기록을 모아 정리하는 중… (길면 1분 정도)</p>}
         </div>

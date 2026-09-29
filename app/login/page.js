@@ -63,11 +63,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
-      <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-700">
+    <div className="nexus-landing min-h-screen flex items-center justify-center px-4 py-8">
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-[#deeadf] bg-white shadow-[0_24px_80px_rgba(69,93,71,.12)] md:grid-cols-[1fr_1.05fr]">
+        <div className="h-44 bg-[url('/nexus-warm-hero.webp')] bg-cover bg-[62%_center] md:min-h-[620px] md:bg-[65%_center]" aria-hidden="true" />
+      <div className="w-full p-7 sm:p-10 md:self-center md:p-12">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Nexus Workspace</h1>
-          <p className="text-slate-500 dark:text-slate-400">아이디로 로그인하세요.</p>
+          <Link href="/" className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#397969] text-xl font-bold text-white">N</Link>
+          <h1 className="mt-4 text-3xl font-bold text-[#263a36] mb-2">업무공간 로그인</h1>
+          <p className="text-[#687c70]">아이디와 PIN 입력</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
@@ -102,15 +105,18 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3.5 rounded-xl bg-[#397969] hover:bg-[#2d6256] text-white font-bold shadow-lg shadow-[#397969]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? '로그인 중...' : '로그인'}
           </button>
         </form>
 
         <div className="mt-6 text-center text-sm text-slate-500">
-          처음이신가요? <Link href="/signup" className="font-bold text-indigo-600 hover:underline">가입하기</Link>
+          처음이신가요? <Link href="/signup" className="font-bold text-[#397969] hover:underline">팀에 합류하기</Link>
         </div>
+        <p className="mt-3 text-center text-sm"><Link href="/guide" className="font-bold text-[#397969] hover:underline">처음 사용하세요? 사용 설명서 보기</Link></p>
+        <p className="text-center text-xs text-[#9aa99a]">Harim Nexus · 원가팀 업무공간</p>
+      </div>
       </div>
     </div>
   )

@@ -29,15 +29,16 @@ export async function GET(request) {
       admin.from('tasks').select('id,title,status,due_date,start_date,created_at,completed_at,delay_reason,deliverable_url').eq('workspace_id', WORKSPACE_ID).eq('assignee_member_id', member.id).is('deleted_at', null)
         .or(`status.neq.완료,and(completed_at.gte.${week.start}T00:00:00+09:00,completed_at.lt.${week.nextStart}T00:00:00+09:00)`)
         .order('due_date').limit(501),
+      admin.from('daily_logs').select('log_date,content').eq('workspace_id', WORKSPACE_ID).eq('member_id', member.id).gte('log_date', week.start).lte('log_date', week.end).order('log_date').limit(8),
     ])
-    const [report, tasks] = results.map(checked)
+    const [report, tasks, logs] = results.map(checked)
     if (tasks.length > 500) throw Object.assign(new Error('주간보고 조회 상한(500건)을 초과했습니다. 관리자에게 문의해 주세요.'), { status: 400 })
     const reviews = tasks.length ? checked(await admin.from('ai_reviews').select('id,entity_type,entity_id,status,summary').eq('workspace_id', WORKSPACE_ID).eq('member_id', member.id).eq('status', 'confirmed').eq('entity_type', 'task').in('entity_id', tasks.map(t => t.id)).limit(501)) : []
     if (reviews.length > 500) throw Object.assign(new Error('비서몬 요약 조회 상한을 초과했습니다.'), { status: 400 })
     const doneIds = tasks.filter(t => t.status === '완료').map(t => t.id)
     // 04 SQL 적용 전이면 점검 내용 없이 초안을 만든다
     const checkResult = doneIds.length ? await admin.from('task_completion_checks').select('task_id,questions,answers,status,created_at').eq('workspace_id', WORKSPACE_ID).in('task_id', doneIds).in('status', ['submitted', 'approved']).limit(1000) : { data: [] }
-    return NextResponse.json({ report, draft: buildWeeklyDraft(tasks, week.start, reviews, undefined, checkResult.error ? [] : checkResult.data), week, isAdmin, member })
+    return NextResponse.json({ report, logs, draft: buildWeeklyDraft(tasks, week.start, reviews, undefined, checkResult.error ? [] : checkResult.data), week, isAdmin, member })
   } catch (error) { return NextResponse.json(apiError(error), { status: error.status || 500 }) }
 }
 

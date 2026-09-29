@@ -50,16 +50,18 @@ export default function MainLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+    <div className="nexus-app-shell min-h-screen flex transition-colors duration-200">
       <Sidebar isHidden={isSidebarHidden} onToggleHidden={toggleSidebar} />
       <main className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${isSidebarHidden ? 'lg:ml-0' : 'lg:ml-[240px]'}`}>
         <Suspense fallback={<div className="h-16 bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700" />}>
           <Header isSidebarHidden={isSidebarHidden} onToggleSidebar={toggleSidebar} />
         </Suspense>
+        <div className="relative mx-4 mt-3 flex h-12 items-center rounded-2xl border border-[#dce8d8] bg-[#eef4e9] px-4 text-xs font-bold text-[#397969] dark:border-slate-700 dark:bg-slate-800 dark:text-emerald-300 lg:hidden">원가팀 업무공간<img src="/nexus-mascot-peek.webp" alt="" aria-hidden="true" className="pointer-events-none absolute bottom-0 right-4 h-16 w-auto" /></div>
         <div className="flex-1 p-4 lg:p-8 max-w-[1920px] mx-auto w-full">
           <SectionTabs />
           {children}
         </div>
+        <footer className="nexus-app-footer mx-auto w-full max-w-[1920px] px-4 pb-5 lg:px-8">Harim Nexus · 원가팀 업무공간</footer>
       </main>
       <CompletionCheckHost />
     </div>

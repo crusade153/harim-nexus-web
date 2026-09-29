@@ -9,6 +9,7 @@ function BoardContent() {
   const searchParams = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
   const initialPostId = searchParams.get('post')
+  const initialIssue = searchParams.get('new') === 'issue'
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -40,6 +41,7 @@ function BoardContent() {
       currentUser={data.currentUser} 
       onRefresh={loadData} 
       initialPostId={initialPostId}
+      initialIssue={initialIssue}
     />
   )
 }

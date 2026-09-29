@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { Archive, Link as LinkIcon, ExternalLink, MessageSquare, Plus, X, Send, Trash2, Edit2 } from 'lucide-react'
 import Editor from '@/components/ui/Editor'
@@ -12,32 +12,40 @@ export default function ArchivePage({ archives = [], currentUser, onRefresh, ini
   const [isEditMode, setIsEditMode] = useState(false) 
   const [newArchive, setNewArchive] = useState({ 카테고리: '매뉴얼', 제목: '', 링크: '', 내용: '' })
   const [commentInput, setCommentInput] = useState('')
-  const categories = ['매뉴얼', '온보딩', '트러블슈팅', '기타']
+  const [categoryFilter, setCategoryFilter] = useState('전체')
+  const [customCategory, setCustomCategory] = useState('')
+  const categories = useMemo(() => [...new Set(['매뉴얼', '온보딩', '트러블슈팅', '기타', ...archives.map(doc => doc.카테고리).filter(Boolean)])], [archives])
+  const visibleArchives = useMemo(() => categoryFilter === '전체' ? archives : archives.filter(doc => doc.카테고리 === categoryFilter), [archives, categoryFilter])
   const isAdmin = isAdminUser(currentUser)
 
   useEffect(() => {
-    if (archives.length > 0 && !selectedDoc) {
+    if (visibleArchives.length > 0 && (!selectedDoc || !visibleArchives.some(doc => doc.ID === selectedDoc.ID))) {
       // /archive?doc=ID 로 들어오면 그 문서를, 아니면 첫 문서를 연다
-      setSelectedDoc(archives.find(doc => doc.ID === String(initialDocId)) || archives[0])
+      setSelectedDoc(visibleArchives.find(doc => doc.ID === String(initialDocId)) || visibleArchives[0])
+    } else if (!visibleArchives.length && selectedDoc) {
+      setSelectedDoc(null)
     } else if (selectedDoc) {
-      const updated = archives.find(a => a.ID === selectedDoc.ID)
-      if (updated) setSelectedDoc(updated)
+      const updated = visibleArchives.find(a => a.ID === selectedDoc.ID)
+      if (updated && updated !== selectedDoc) setSelectedDoc(updated)
     }
-  }, [archives, selectedDoc, initialDocId])
+  }, [visibleArchives, selectedDoc, initialDocId])
 
   const handleSave = async () => {
-    if (!newArchive.제목) { toast.error('제목을 입력해주세요!'); return }
+    if (!newArchive.제목.trim()) { toast.error('제목을 입력해주세요!'); return }
+    const category = newArchive.카테고리 === '__new__' ? customCategory.trim() : newArchive.카테고리
+    if (!category || category.length > 40) { toast.error('분류를 1~40자로 입력해 주세요.'); return }
     try {
       if (isEditMode) {
-        await updateArchive(selectedDoc.ID, newArchive, currentUser?.이름)
+        await updateArchive(selectedDoc.ID, { ...newArchive, 카테고리: category }, currentUser?.이름)
         toast.success('문서가 수정되었습니다.')
       } else {
-        await createArchive({ ...newArchive, 작성자: currentUser?.이름 || '익명' })
+        await createArchive({ ...newArchive, 카테고리: category, 작성자: currentUser?.이름 || '익명' })
         toast.success('문서가 저장되었습니다!')
       }
       setIsModalOpen(false)
       setIsEditMode(false)
       setNewArchive({ 카테고리: '매뉴얼', 제목: '', 링크: '', 내용: '' })
+      setCustomCategory('')
       if (onRefresh) onRefresh()
     } catch (error) { toast.error('저장 실패') }
   }
@@ -82,8 +90,9 @@ export default function ArchivePage({ archives = [], currentUser, onRefresh, ini
           <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2"><Archive className="text-indigo-600" /> 아카이브</h2>
           <button onClick={() => { setIsEditMode(false); setNewArchive({ 카테고리: '매뉴얼', 제목: '', 링크: '', 내용: '' }); setIsModalOpen(true); }} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors"><Plus size={20} /></button>
         </div>
+        <select aria-label="아카이브 분류" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"><option>전체</option>{categories.map(category => <option key={category}>{category}</option>)}</select>
         <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-200px)] custom-scrollbar">
-          {archives.map(doc => (
+          {visibleArchives.map(doc => (
             <div key={doc.ID} onClick={() => setSelectedDoc(doc)} className={`p-3 rounded-lg cursor-pointer border transition-all ${selectedDoc?.ID === doc.ID ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 ring-1 ring-indigo-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50'}`}>
               <p className={`font-bold text-sm truncate ${selectedDoc?.ID === doc.ID ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>{doc.제목}</p>
               <div className="flex items-center gap-2 mt-1.5"><span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-medium">{doc.카테고리}</span><span className="text-xs text-slate-400">· {doc.작성자}</span></div>
@@ -135,9 +144,10 @@ export default function ArchivePage({ archives = [], currentUser, onRefresh, ini
             <div className="p-6 space-y-5 overflow-y-auto">
               <input type="text" value={newArchive.제목} onChange={e => setNewArchive({...newArchive, 제목: e.target.value})} className="w-full px-4 py-2.5 border rounded-lg" placeholder="제목" />
               <div className="grid grid-cols-2 gap-4">
-                <select value={newArchive.카테고리} onChange={e => setNewArchive({...newArchive, 카테고리: e.target.value})} className="w-full px-3 py-2.5 border rounded-lg">{categories.map(c => <option key={c}>{c}</option>)}</select>
+                <select value={newArchive.카테고리} onChange={e => setNewArchive({...newArchive, 카테고리: e.target.value})} className="w-full px-3 py-2.5 border rounded-lg">{categories.map(c => <option key={c}>{c}</option>)}<option value="__new__">+ 새 분류 만들기</option></select>
                 <input type="text" value={newArchive.링크} onChange={e => setNewArchive({...newArchive, 링크: e.target.value})} className="w-full px-3 py-2.5 border rounded-lg" placeholder="관련 링크" />
               </div>
+              {newArchive.카테고리 === '__new__' && <input value={customCategory} onChange={e => setCustomCategory(e.target.value)} maxLength={40} autoFocus className="w-full rounded-lg border px-4 py-2.5 dark:bg-slate-900 dark:text-white" placeholder="새 분류 이름" />}
               <Editor content={newArchive.내용} onChange={html => setNewArchive({...newArchive, 내용: html})} />
             </div>
             <div className="flex gap-3 p-6 pt-2 border-t"><button onClick={() => setIsModalOpen(false)} className="flex-1 btn-secondary">취소</button><button onClick={handleSave} className="flex-1 btn-primary">{isEditMode ? '수정' : '저장'}</button></div>

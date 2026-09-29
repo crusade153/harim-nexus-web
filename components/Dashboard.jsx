@@ -159,20 +159,21 @@ export default function Dashboard({ data, onRefresh }) {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <div className="relative flex min-h-[160px] flex-col justify-between gap-4 overflow-hidden rounded-[1.75rem] border border-[#dce8d8] bg-gradient-to-r from-[#eaf3e7] via-[#f7f6e9] to-[#fff1df] p-6 shadow-sm dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 md:flex-row md:items-center md:p-8">
+        <div className="relative z-10">
+          <p className="mb-2 text-xs font-bold tracking-[.12em] text-[#4c8b73]">원가팀 업무공간</p>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
             {viewMode === 'mine'
-              ? <>안녕하세요, {myName || '팀원'}님! 👋</>
-              : <>안녕하세요, 원가팀! 👋</>}
+              ? <>{myName || '팀원'}님의 업무 현황</>
+              : <>원가팀 업무 현황</>}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             {viewMode === 'mine'
-              ? '내게 배정된 업무와 팀 소식을 확인하세요.'
-              : '팀 전체의 업무 현황과 주요 이슈를 확인하세요.'}
+              ? '진행 업무 · 마감 일정 · 팀 소식'
+              : '팀 업무 · 마감 일정 · 주요 이슈'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="relative z-10 flex items-center gap-2 lg:mr-32">
           {/* 팀 전체 / 내 업무 토글 */}
           <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden text-xs font-bold">
             <button onClick={() => setViewMode('team')} className={`px-3 py-2 flex items-center gap-1.5 ${viewMode === 'team' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}><Users size={14} /> 팀 전체</button>
@@ -182,6 +183,7 @@ export default function Dashboard({ data, onRefresh }) {
             <ArrowUpRight size={16} /> 동기화
           </button>
         </div>
+        <img src="/nexus-mascot-peek.webp" alt="" aria-hidden="true" className="pointer-events-none absolute bottom-0 right-3 hidden h-36 w-auto lg:block" />
       </div>
 
       {/* 상단 통계 카드 */}

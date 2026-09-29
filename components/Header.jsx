@@ -8,6 +8,7 @@ import QuickAdd from './QuickAdd'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { NEXUS_DB_SCHEMA } from '@/lib/db-config'
+import OnlinePresence from './OnlinePresence'
 
 export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
   const [isDark, setIsDark] = useState(false)
@@ -102,7 +103,7 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 h-16 pl-16 pr-4 lg:px-8 transition-colors duration-200">
+      <header className="sticky top-0 z-20 bg-[#fffdf7]/88 dark:bg-slate-900/85 backdrop-blur-xl border-b border-[#dce8dd] dark:border-slate-700 h-16 pl-16 pr-4 lg:px-8 transition-colors duration-200">
         <div className="flex items-center justify-between h-full max-w-[1600px] mx-auto">
           
           <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
@@ -117,8 +118,9 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
             <span className="text-slate-300 dark:text-slate-600">/</span>
             <span>원가팀</span>
           </div>
+          <div className="nexus-header-peek relative hidden h-16 w-16 shrink-0 lg:block" aria-hidden="true"><img src="/nexus-mascot-peek.webp" alt="" className="pointer-events-none absolute -bottom-2 left-0 h-[70px] w-auto max-w-none" /></div>
 
-          <form onSubmit={submitSearch} className="flex-1 max-w-md mx-4 lg:mx-8" role="search">
+          <form onSubmit={submitSearch} className="flex-1 max-w-md mx-3 lg:mx-6" role="search">
             <div className="relative group">
               <input
                 type="text"
@@ -135,6 +137,7 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
           </form>
 
           <div className="flex items-center gap-2">
+            <OnlinePresence />
             <QuickAdd />
             <button 
               onClick={toggleTheme}

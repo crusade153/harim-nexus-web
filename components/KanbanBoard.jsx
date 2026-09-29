@@ -19,6 +19,7 @@ import { CSS } from '@dnd-kit/utilities'
 import Drawer from '@/components/ui/Drawer'
 import { updateTaskStatus, createTask, createComment, deleteTask, updateTask } from '@/lib/sheets'
 import { isAdmin as isAdminUser } from '@/lib/roles'
+import { addDays, seoulDate } from '@/lib/weekly-utils.mjs'
 
 // 1. 충돌 감지 알고리즘
 function customCollisionDetection(args) {
@@ -122,11 +123,12 @@ function KanbanColumn({ id, title, count, totalCount, isExpanded, onToggle, chil
 }
 
 // 4. 메인 칸반 보드 컴포넌트
-export default function KanbanBoard({ tasks: initialTasks, archives = [], currentUser, onRefresh, initialTaskId = null }) {
+export default function KanbanBoard({ tasks: initialTasks, archives = [], currentUser, onRefresh, initialTaskId = null, completedRange, onCompletedRangeChange, completedLimitReached = false }) {
   const [items, setItems] = useState(initialTasks)
   const [selectedTask, setSelectedTask] = useState(null)
   const [activeId, setActiveId] = useState(null)
   const [showAllDone, setShowAllDone] = useState(false)
+  const [rangeDraft, setRangeDraft] = useState(completedRange)
   const [activeMobileColumn, setActiveMobileColumn] = useState('진행중')
   
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
@@ -141,6 +143,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
   useEffect(() => {
     setItems(initialTasks)
   }, [initialTasks])
+  useEffect(() => { setRangeDraft(completedRange); setShowAllDone(false) }, [completedRange])
 
   // 알림·검색에서 /kanban?task=ID 로 들어오면 그 업무 상세를 연다 (최초 1회)
   const [openedInitialTask, setOpenedInitialTask] = useState(false)
@@ -343,7 +346,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">업무 보드</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">팀의 업무 흐름을 관리하세요.</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">진행 업무는 계속 보이고, 완료 업무는 선택한 기간만 보여요. 지난 완료 건은 보관됩니다.</p>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setOnlyMyTasks(!onlyMyTasks)} className={`btn-secondary text-xs flex items-center gap-2 ${onlyMyTasks ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : ''}`}>
@@ -354,6 +357,17 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
             </button>
           </div>
         </div>
+
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs dark:border-slate-700 dark:bg-slate-800">
+          <span className="font-bold text-slate-700 dark:text-slate-200">완료 업무 조회</span>
+          <button type="button" onClick={() => onCompletedRangeChange({ from: addDays(seoulDate(), -29), to: '', undated: false })} className="rounded-lg bg-emerald-50 px-3 py-1.5 font-semibold text-emerald-700 hover:bg-emerald-100">최근 30일</button>
+          <button type="button" onClick={() => onCompletedRangeChange({ from: addDays(seoulDate(), -89), to: '', undated: false })} className="rounded-lg bg-slate-100 px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200">최근 90일</button>
+          <button type="button" onClick={() => onCompletedRangeChange({ from: addDays(seoulDate(), -29), to: '', undated: true })} className="rounded-lg bg-slate-100 px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200">완료일 미상</button>
+          <label className="flex items-center gap-1 text-slate-500">시작 <input aria-label="완료일 시작" type="date" value={rangeDraft.from} onChange={e => setRangeDraft(range => ({ ...range, from: e.target.value }))} className="rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900" /></label>
+          <label className="flex items-center gap-1 text-slate-500">종료 <input aria-label="완료일 종료" type="date" value={rangeDraft.to} onChange={e => setRangeDraft(range => ({ ...range, to: e.target.value }))} className="rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900" /></label>
+          <button type="button" onClick={() => { if (rangeDraft.from && (!rangeDraft.to || rangeDraft.to >= rangeDraft.from)) onCompletedRangeChange({ ...rangeDraft, undated: false }); else toast.error('완료일 기간을 확인해 주세요.') }} className="rounded-lg bg-slate-800 px-3 py-1.5 font-semibold text-white dark:bg-slate-600">기간 조회</button>
+        </div>
+        {completedLimitReached && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">완료 업무는 한 번에 최근 200건까지 표시합니다. 기간을 좁혀 더 살펴보세요.</p>}
 
         <div className="flex md:hidden bg-slate-100 dark:bg-slate-800 p-1 rounded-xl overflow-x-auto scrollbar-hide">
           {columns.map(col => (

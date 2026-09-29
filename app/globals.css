@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Nunito+Sans:wght@400;500;600;700;800&display=swap');
 
 body {
   @apply font-sans bg-slate-50 text-slate-800 antialiased transition-colors duration-200;
@@ -13,7 +13,7 @@ body {
 @layer components {
   /* 🏗️ 카드 스타일 (다크 모드 대응) */
   .card-base {
-    @apply bg-white border border-slate-200 rounded-xl transition-all duration-200;
+    @apply bg-white border border-[#e2e9df] rounded-xl transition-all duration-200;
     @apply dark:bg-slate-800 dark:border-slate-700;
   }
   
@@ -24,8 +24,8 @@ body {
 
   /* 🔘 버튼 스타일 */
   .btn-primary {
-    @apply bg-slate-900 text-white px-4 py-2.5 rounded-lg font-medium text-sm 
-           hover:bg-black transition-colors shadow-sm flex items-center justify-center gap-2;
+    @apply bg-[#397969] text-white px-4 py-2.5 rounded-lg font-medium text-sm
+           hover:bg-[#2d6256] transition-colors shadow-sm flex items-center justify-center gap-2;
     @apply dark:bg-primary-600 dark:hover:bg-primary-500;
   }
 
@@ -40,3 +40,18 @@ body {
     @apply px-2.5 py-1 rounded-md text-xs font-semibold inline-flex items-center gap-1;
   }
 }
+
+.nexus-landing { background: radial-gradient(circle at 78% 4%, #e4f1e6 0, transparent 36%), #fffdf7; font-family: 'Nunito Sans', 'Malgun Gothic', sans-serif; }
+.nexus-hero-art { background: url('/nexus-warm-hero.webp') center / cover no-repeat; animation: nexus-breathe 15s ease-in-out infinite alternate; }
+.nexus-hero-wash { background: linear-gradient(90deg, rgba(255,251,241,.98) 0%, rgba(255,251,241,.91) 30%, rgba(255,251,241,.58) 51%, rgba(255,251,241,.03) 75%); }
+.nexus-rise { animation: nexus-rise .65s both; }
+.nexus-delay-1 { animation-delay: .1s; }.nexus-delay-2 { animation-delay: .2s; }.nexus-delay-3 { animation-delay: .3s; }
+.nexus-app-shell { background: radial-gradient(circle at 70% -10%, rgba(222,239,220,.9), transparent 34%), linear-gradient(180deg, #fbfaf5 0%, #f4f7f1 100%); }
+.dark .nexus-app-shell { background: #0f172a; }
+.nexus-app-footer { color: #74857a; font-size: 11px; }
+.nexus-header-peek img { transform-origin: center bottom; animation: nexus-peek 5s ease-in-out infinite alternate; }
+@keyframes nexus-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes nexus-breathe { from { transform: scale(1); } to { transform: scale(1.035); } }
+@keyframes nexus-peek { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
+@media (max-width: 760px) { .nexus-hero-art { background-position: 59% center; }.nexus-hero-wash { background: linear-gradient(90deg, rgba(255,251,241,.97), rgba(255,251,241,.75)); } }
+@media (prefers-reduced-motion: reduce) { .nexus-hero-art,.nexus-rise,.nexus-header-peek img { animation: none; } }

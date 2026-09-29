@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, X, LogOut, PanelLeftClose } from 'lucide-react'
+import { Menu, X, LogOut, PanelLeftClose, BookOpen } from 'lucide-react'
 import { NAV_SECTIONS, findSection } from '@/lib/nav'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
@@ -49,6 +49,8 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
             if (status === 'SUBSCRIBED') {
               await channel.track({
                 user_id: member.login_id,
+                name: member.name,
+                position: member.position || '',
                 online_at: new Date().toISOString(),
               })
             }
@@ -84,12 +86,12 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
       </button>
 
       <aside className={`
-        fixed inset-y-0 left-0 z-40 w-[240px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col
+        fixed inset-y-0 left-0 z-40 w-[240px] bg-[#fffdf8] dark:bg-slate-900 border-r border-[#dce8dd] dark:border-slate-800 flex flex-col
         transform transition-transform duration-300 ease-in-out
         ${isMobileOpen ? 'translate-x-0' : isHidden ? '-translate-x-full' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-sm">N</div>
+          <div className="w-8 h-8 bg-[#397969] rounded-xl flex items-center justify-center text-white font-bold mr-3 shadow-sm">N</div>
           <div>
             <h1 className="font-bold text-slate-900 dark:text-white tracking-tight">Nexus</h1>
             <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Workspace</p>
@@ -133,6 +135,7 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
         </nav>
 
         <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+          <Link href="/guide" onClick={() => setIsMobileOpen(false)} className="mb-3 flex items-center gap-3 rounded-xl border border-[#d3e5d5] bg-[#f3f9f2] px-3 py-2.5 text-sm font-bold text-[#367766] hover:bg-[#e6f2e8]"><BookOpen size={18} /> 사용 설명서</Link>
           <div 
             onClick={handleLogout} 
             className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer group"

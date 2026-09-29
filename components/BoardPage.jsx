@@ -6,7 +6,7 @@ import { createPost, createComment, deletePost, updatePost, deleteComment } from
 import { uploadWorkspaceFile } from '@/lib/work-os'
 import { isAdmin as isAdminUser } from '@/lib/roles'
 
-export default function BoardPage({ posts, currentUser, onRefresh, initialPostId = null }) {
+export default function BoardPage({ posts, currentUser, onRefresh, initialPostId = null, initialIssue = false }) {
   const [filter, setFilter] = useState('전체')
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false)
   const [selectedPost, setSelectedPost] = useState(null)
@@ -17,6 +17,13 @@ export default function BoardPage({ posts, currentUser, onRefresh, initialPostId
   const [commentInput, setCommentInput] = useState('')
 
   const isAdmin = isAdminUser(currentUser)
+  useEffect(() => {
+    if (initialIssue) {
+      const draft = sessionStorage.getItem(`nexus_issue_draft_${currentUser?.ID}`) || ''
+      setNewPost({ 제목: '', 태그: '이슈', 내용: draft, 첨부파일: null })
+      setIsWriteModalOpen(true)
+    }
+  }, [initialIssue, currentUser?.ID])
 
   // /board?post=ID 로 들어오면 그 글을 연다 (최초 1회)
   const [openedInitialPost, setOpenedInitialPost] = useState(false)
@@ -69,6 +76,7 @@ export default function BoardPage({ posts, currentUser, onRefresh, initialPostId
       }
       
       setNewPost({ 제목: '', 태그: '일반', 내용: '', 첨부파일: null })
+      if (initialIssue) sessionStorage.removeItem(`nexus_issue_draft_${currentUser?.ID}`)
       setIsWriteModalOpen(false)
       setIsEditMode(false)
       if (onRefresh) onRefresh()
@@ -241,7 +249,7 @@ export default function BoardPage({ posts, currentUser, onRefresh, initialPostId
                 <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">카테고리</label><select value={newPost.태그} onChange={(e) => setNewPost({...newPost, 태그: e.target.value})} className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-transparent focus:border-indigo-500 outline-none dark:text-white appearance-none"><option>일반</option><option>이슈</option><option>공지</option><option>긴급</option><option>자료</option></select></div>
                 <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">첨부파일</label><label className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 text-gray-500 text-sm flex items-center justify-between gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"><span className="truncate">{newPost.첨부파일 ? newPost.첨부파일.name : '클릭하여 파일 업로드'}</span><ImageIcon size={18} className="opacity-50"/><input type="file" className="hidden" onChange={handleFileChange} /></label></div>
               </div>
-              <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">내용 <span className="text-red-500">*</span></label><textarea value={newPost.내용} onChange={(e) => setNewPost({...newPost, 내용: e.target.value})} className="w-full h-40 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-transparent focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none transition-all dark:text-white" placeholder="내용을 입력하세요..." /></div>
+              <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">내용 <span className="text-red-500">*</span></label><textarea value={newPost.내용} onChange={(e) => setNewPost({...newPost, 내용: e.target.value})} className="w-full h-40 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-transparent focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none transition-all dark:text-white" placeholder={newPost.태그 === '이슈' ? '무슨 일이 있었나요?\n영향은 무엇인가요?\n어떤 도움이나 결정이 필요한가요?' : '내용을 입력하세요...'} /></div>
             </div>
             <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100 dark:border-slate-800">
               <button onClick={() => { setIsWriteModalOpen(false); setIsEditMode(false); }} className="px-6 py-3 rounded-xl font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">취소</button>
