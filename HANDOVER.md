@@ -22,7 +22,7 @@
 - **완전 리빌드**: 기존 회원·업무 데이터는 옮기지 않고 새로 시작
 - 기본 관리자 아이디 `admin` (PIN은 팀장만 앎)
 - **가입은 간단히**: 아이디 + 이름 + 숫자 6자리 PIN, 승인 없이 바로 사용. 권한은 너무 보수적이지 않게
-- **팀장 약 6개월 부재 예정** → 부재 중에는 **DeepSeek AI(`DeepSeek-V4-Pro-0813`)가 팀장 대신** 팀원의 업무 기록에 후속 질문하고, 정리한 요약을 팀원에게 확인받는 방식으로 운영 (Phase A, 미구현)
+- **팀장 약 6개월 부재 예정** → 부재 중에는 **DeepSeek AI가 팀장 대신** 팀원의 업무 기록에 후속 질문하고, 정리한 요약을 팀원에게 확인받는 방식으로 운영. Phase A 코드 구현 완료, 운영 SQL 적용·외부 전송 활성화 대기. 실제 API 모델 ID는 `deepseek-v4-pro`.
 - Supabase 무료 프로젝트 2개를 이미 써서, **기존 프로젝트 안의 별도 스키마**를 사용
 
 ---
@@ -84,22 +84,24 @@
 
 ## 4. 다음 할 일 (우선순위 순)
 
-### ① P1 + Phase A — 홈 · 주간보고 · AI 팀장 대리 (팀장 부재 전 필수)
-- **홈 화면**: 지연/오늘/이번 주 내 업무, 요청받은 일, 알림 피드, 주간보고 상태 카드 (`getWorkHubData()`·`classifyDueDate` 재사용)
-- **주간보고 `/weekly`**: 한 주 완료·진행·다음 주 마감·지연 사유로 초안 자동 생성(`buildWeeklyDraft` 순수 함수 + 테스트) → 팀원 다듬고 제출 → 팀장(부재 시 대리 관리자) 취합·인쇄(`ExecutiveReport.jsx` 인쇄 스타일 재사용). 메뉴 `lib/nav.js` 에 추가
-- **DB 마이그레이션** (harim_nexus 스키마 기준, 새 파일 `supabase/bootstrap/02_*.sql`):
-  `tasks` 에 `completed_at`(완료 전환 트리거), `updated_at`, `requested_by_member_id`, `accepted_at`, `source`, `source_ref`, `closing_run_id` /
-  `weekly_reports` / `ai_reviews`(entity, member, trigger, status, round, summary jsonb, risk_level, model, 토큰 수) / `ai_review_messages` /
-  `workspace_settings.ai_guidelines`. RLS 는 `harim_nexus_private.has_workspace_access()` 패턴.
-  알림 생성(배정·내 업무 댓글·완료)을 DB 트리거로 옮기기
-- **AI 대리 (DeepSeek)**: `lib/ai/deepseek.js`(서버 전용, OpenAI 호환 `POST {DEEPSEEK_BASE_URL}/chat/completions`, `fetch`, JSON 출력 강제, 파싱 실패 1회 재시도, 30초 타임아웃), `lib/ai/prompts.js`, `app/api/ai/review/route.js`
-  - 흐름: 팀원 기록(업무 완료/지연/주간보고 제출/월마감 항목) → AI 후속 질문 1~3개(최대 2라운드) → 답변 → 요약(한 일/근거·산출물/다음 할 일/리스크) → 팀원 [확인] → 확정 요약만 공식 기록·주간보고 반영. 리스크 높음 → 에스컬레이션 목록
-  - AI 는 질문·정리만. 업무 상태·담당·마감은 절대 직접 바꾸지 않음
-  - 안전장치: 1인 하루 호출 상한, 월 토큰 예산, API 실패 시에도 기록은 먼저 저장(`failed` 로 남기고 재시도)
-  - ⚠️ 모델 ID `DeepSeek-V4-Pro-0813` 이 API 상 정확한 ID인지 `GET /models` 로 먼저 확인 → `DEEPSEEK_MODEL`
-  - ⚠️ 업무 내용이 외부 API 로 전송됨 — 회사 보안 정책 확인 필요(팀장에게 안내함). 필요 시 숫자 가림 옵션
-  - 관리자 설정에 "AI 운영 지침" 입력칸 (팀장이 부재 전 작성)
-- 부재 중 **대리 관리자 1명** 지정 권장 (members.role='admin' 으로 바꾸면 코드 수정 없이 동작)
+### ① P1 + Phase A — 완료·운영 DB 적용·실제 검증 끝 (2026-09-29)
+- **적용 안내:** `supabase/bootstrap/PHASE_A.md`. **`02_p1_phase_a.sql` 운영 DB 적용 완료(팀장, 2026-09-29).** 새 표 4개·tasks 새 칸 확인함.
+- 홈 `/dashboard`: 내 업무 마감 3분류, 요청 확인, 알림 피드, 보고 상태, AI 대기 건수. `getWorkHubData({surface:'home'})` 사용. 기존 대시보드 `/team-dashboard` 보존.
+- `/weekly`: `buildWeeklyDraft` 한국시간 주차·완료일 기준 초안, 직접 편집·저장·제출, 관리자 취합·인쇄. 동시 수정 방지. 완료일 미상 기존 업무는 자동 완료 목록에서 제외.
+- `/ai`: 기록 저장 시 DB에 검토 대기열 생성 → 팀원이 질문 시작 → 최대 2라운드 → 요약 확인 → 공식 기록. 확인된 높은 리스크만 관리자에게 알림. 원본 수정 시 이전 검토 제외. 월마감 실행 생성은 P2.
+- `lib/ai/deepseek.js`: 서버 전용 fetch, JSON+스키마 검증, 파싱 1회 재시도, 요청당 30초 제한. DB 원자적 호출 예약으로 일·월 상한/중복 실행 보호. 답변은 외부 호출 전에 저장.
+- 관리자 `/ai` 운영 설정: 운영 지침, 외부 전송 활성화(기본 꺼짐), 숫자 가림(기본 켜짐), 일 호출/월 토큰 예산.
+- 모델 `GET /models` 확인: `deepseek-v4-pro`. 로컬 `.env.local` 모델 설정 완료. 가상 문서로 실제 JSON 응답 1회 확인. **실제 업무 데이터는 전송하지 않았다.** 배포 환경변수는 별도 확인.
+- 새 표/상태 전이 SQL: `weekly_reports`, `ai_reviews`, `ai_review_messages`, `ai_call_usage`; 업무 완료 시각/요청/출처 필드, 알림 트리거. RLS·서버 본인 검증. 공유 `public`/Auth/Storage는 변경하지 않음.
+- 검증: 단위 테스트 15개, Next 빌드, 분리된 PGlite로 SQL 재실행·RLS·쿼터·확인·동시성 경계. 브라우저는 실제 앱+가상 응답으로 확인. 운영 Supabase Data API/배포/Functions 지표는 아직 미검증.
+- **운영 DB 실제 검증 (2026-09-29, 임시 계정 zztest03~05, 가상 내용만 DeepSeek 전송, 끝나고 전부 삭제):**
+  업무 완료 → 완료시각·관리자 알림·AI 대기열 / 외부전송 꺼짐이면 호출 0건(503) / AI 질문 3개 → 일부만 답하면 거부 → 답변 → 요약 → 확인 / 확정 후 재실행 불가 /
+  주간보고 초안에 완료 업무+AI 요약 포함 → 제출 → 주간보고 AI 검토 → 관리자 취합에 표시, 팀원은 취합 못 봄 / 홈·주간보고·AI 화면 실제 로그인으로 표시·콘솔 오류 없음.
+  호출 1건당 대략 입력 450~600 / 출력 160~210 토큰.
+- 검증 중 고친 것: AI 요약에 `record.title=` 같은 필드명이 섞임 → 프롬프트에 자연스러운 문장 지시 추가(`lib/ai/prompts.js`).
+  숫자 가림이 날짜까지 가려 "10월 2일"이 "[숫자]월 [숫자]일"로 기록됨 → 날짜·주차·시각은 남기고 금액·수량·비율만 가리도록 `maskNumbers` 수정 + 테스트.
+- 팀장 할 일 (남음): Vercel 환경변수(`DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL=deepseek-v4-pro`, `DEEPSEEK_BASE_URL`) → `/ai` 운영 설정에서 지침 작성 → 회사 보안 정책 확인 후 외부 전송 켜기(현재 **꺼짐**) → 대리 관리자 지정.
+- 커밋·푸시 완료 (2026-09-29). 배포는 Vercel 자동 배포 여부·환경변수 확인 필요.
 
 ### ② P2 — 월마감 + Google Workspace 연동
 - `/closing`: `task_templates`(checklist·recurrence_rule 이미 있음) 를 마감 템플릿으로, `closing_runs` 로 매월 업무 자동 생성·배정. 영업일 계산 `addBusinessDays` + 테스트
@@ -135,6 +137,6 @@
 
 ```
 HANDOVER.md 를 읽고 이어서 작업해줘.
-다음 작업은 "4-① P1 + Phase A (홈·주간보고·AI 팀장 대리)" 야.
+다음 작업은 "4-② P2 (월마감 + Google Chat 연동)" 야.
 DB 변경은 supabase/bootstrap/02_*.sql 로 만들고, 적용은 내가 SQL Editor 에서 할게.
 ```

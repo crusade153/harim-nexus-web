@@ -37,3 +37,7 @@ next-env.d.ts
 
 # local data backups (may contain personal data)
 backup/
+
+# local browser verification artifacts
+/.playwright-cli/
+/output/playwright/

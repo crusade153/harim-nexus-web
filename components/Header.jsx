@@ -24,14 +24,19 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
   // 미확인 알림 수: 처음, 1분마다, 창으로 돌아올 때 다시 센다
   useEffect(() => {
     let active = true
-    const refresh = () => getUnreadNotificationCount().then(count => { if (active) setUnreadCount(count) })
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return
+      getUnreadNotificationCount().then(count => { if (active) setUnreadCount(count) })
+    }
     refresh()
     const timer = window.setInterval(refresh, 60000)
     window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
     return () => {
       active = false
       window.clearInterval(timer)
       window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
     }
   }, [])
 
