@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import {
   Activity, ArchiveRestore, Bell, Bot, BriefcaseBusiness, CheckCircle2, Clock3,
@@ -23,9 +24,11 @@ const tabItems = [
   { id: 'search', label: '통합검색', icon: FolderSearch2 },
   { id: 'files', label: '파일', icon: FileText },
   { id: 'templates', label: '템플릿', icon: Sparkles },
-  { id: 'portfolio', label: '목표·포트폴리오', icon: Goal },
-  { id: 'automation', label: '자동화', icon: Bot, adminOnly: true },
-  { id: 'governance', label: '감사·복구', icon: ShieldCheck, adminOnly: true }
+  { id: 'portfolio', label: '목표·포트폴리오', icon: Goal }
+]
+const adminTabs = [
+  { id: 'automation', label: '자동화·웹훅', icon: Bot },
+  { id: 'governance', label: '감사·복구·보안', icon: ShieldCheck }
 ]
 
 const statusLabels = {
@@ -53,8 +56,10 @@ function SectionTitle({ title, description, action }) {
   )
 }
 
-export default function WorkHub({ initialTab = 'my', initialQuery = '' }) {
+export default function WorkHub({ initialTab = 'my', initialQuery = '', adminMode = false }) {
+  const router = useRouter()
   const [tab, setTab] = useState(initialTab)
+  const dataSurface = adminMode ? (tab === 'governance' ? 'governance' : 'automation') : 'work'
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -63,24 +68,30 @@ export default function WorkHub({ initialTab = 'my', initialQuery = '' }) {
   const [searching, setSearching] = useState(false)
   const [saving, setSaving] = useState(false)
   const [trash, setTrash] = useState([])
+  const loadId = useRef(0)
+
+  useEffect(() => { if (adminMode) setTab(initialTab) }, [adminMode, initialTab])
 
   const load = useCallback(async () => {
+    const currentLoad = ++loadId.current
     setLoading(true)
     setError('')
     try {
-      setData(await getWorkHubData())
+      const nextData = await getWorkHubData({ surface: dataSurface, tab })
+      if (currentLoad === loadId.current) setData(nextData)
     } catch (loadError) {
-      setError(loadError.message || '업무 허브를 불러오지 못했습니다.')
+      if (currentLoad === loadId.current) setError(loadError.message || '업무 허브를 불러오지 못했습니다.')
     } finally {
-      setLoading(false)
+      if (currentLoad === loadId.current) setLoading(false)
     }
-  }, [])
+  }, [dataSurface, tab])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
+    if (adminMode) return
     window.addEventListener(TASKS_CHANGED_EVENT, load)
     return () => window.removeEventListener(TASKS_CHANGED_EVENT, load)
-  }, [load])
+  }, [adminMode, load])
   useEffect(() => {
     if (initialQuery.trim().length >= 2) runSearch(initialQuery)
   // 최초 진입 검색어만 처리한다.
@@ -119,13 +130,23 @@ export default function WorkHub({ initialTab = 'my', initialQuery = '' }) {
     </div>
   )
 
-  const visibleTabs = tabItems.filter(item => !item.adminOnly || data.isAdmin)
+  if (adminMode) return (
+    <div className="mx-auto max-w-[1500px] space-y-6 p-4 md:p-8">
+      <header><p className="text-sm font-semibold text-indigo-600">관리자</p><h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">관리자 설정</h1><p className="mt-2 text-sm text-slate-500">자동화·웹훅과 감사·복구·보안 정책을 관리합니다.</p></header>
+      <nav className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-label="관리자 설정 메뉴">
+        {adminTabs.map(item => { const Icon = item.icon; return <button key={item.id} onClick={() => { setTab(item.id); router.replace(`/admin/settings?tab=${item.id}`, { scroll: false }) }} aria-current={tab === item.id ? 'page' : undefined} className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${tab === item.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><Icon size={17} />{item.label}</button> })}
+      </nav>
+      <main className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-7">
+        {tab === 'governance' ? <GovernancePanel data={data} trash={trash} setTrash={setTrash} onReload={load} /> : <AutomationPanel data={data} onReload={load} saving={saving} setSaving={setSaving} />}
+      </main>
+    </div>
+  )
 
   return (
     <div className="mx-auto min-h-full max-w-[1500px] space-y-6 p-4 md:p-8">
       <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-6 text-white shadow-xl md:p-8">
         <div className="flex flex-wrap items-end justify-between gap-5">
-          <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-300">Nexus Work OS</p><h1 className="mt-2 text-2xl font-black md:text-3xl">{data.identity.member.name}님의 업무 허브</h1><p className="mt-2 text-sm text-slate-300">나의 업무, 알림, 지식, 목표와 자동화를 한 흐름에서 관리합니다.</p></div>
+          <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-300">Nexus Work OS</p><h1 className="mt-2 text-2xl font-black md:text-3xl">{data.identity.member.name}님의 업무 허브</h1><p className="mt-2 text-sm text-slate-300">나의 업무, 알림, 파일과 목표를 한곳에서 확인합니다.</p></div>
           <div className="grid grid-cols-3 gap-2 text-center">
             <Metric label="지연" value={tasks.overdue.length} danger />
             <Metric label="오늘" value={tasks.today.length} />
@@ -135,7 +156,7 @@ export default function WorkHub({ initialTab = 'my', initialQuery = '' }) {
       </div>
 
       <div className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        {visibleTabs.map(item => {
+        {tabItems.map(item => {
           const Icon = item.icon
           return <button key={item.id} onClick={() => setTab(item.id)} className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${tab === item.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><Icon size={17} />{item.label}</button>
         })}
@@ -148,8 +169,6 @@ export default function WorkHub({ initialTab = 'my', initialQuery = '' }) {
         {tab === 'files' && <FilesPanel files={data.files || []} onReload={load} />}
         {tab === 'templates' && <TemplatesPanel templates={data.templates || []} onReload={load} saving={saving} setSaving={setSaving} />}
         {tab === 'portfolio' && <PortfolioPanel goals={data.goals || []} links={data.goalLinks || []} onReload={load} saving={saving} setSaving={setSaving} />}
-        {tab === 'automation' && data.isAdmin && <AutomationPanel data={data} onReload={load} saving={saving} setSaving={setSaving} />}
-        {tab === 'governance' && data.isAdmin && <GovernancePanel data={data} trash={trash} setTrash={setTrash} onReload={load} />}
       </main>
     </div>
   )
