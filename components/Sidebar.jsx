@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Menu, X, LogOut, PanelLeftClose, BookOpen } from 'lucide-react'
@@ -8,65 +8,16 @@ import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import { isAdmin as isAdminUser } from '@/lib/roles'
 
-export default function Sidebar({ isHidden = false, onToggleHidden }) {
+export default function Sidebar({ member, isHidden = false, onToggleHidden }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
 
-  const [myProfile, setMyProfile] = useState({ name: '', position: '', initial: '', loginId: '', role: 'member' })
+  const myProfile = { name: member.name, position: member.position, initial: member.name?.[0] || '?', loginId: member.login_id, role: member.role || 'member' }
 
   const isAdmin = isAdminUser(myProfile)
   const visibleSections = NAV_SECTIONS.filter(section => !section.adminOnly || isAdmin)
   const activeSectionId = findSection(pathname)?.id
-
-  useEffect(() => {
-    let channel = null;
-
-    const initSidebar = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
-        const { data: member } = await supabase
-          .from('members')
-          .select('name, position, login_id, role')
-          .eq('auth_id', user.id)
-          .single()
-        
-        if (member) {
-          setMyProfile({
-            name: member.name,
-            position: member.position,
-            initial: member.name ? member.name[0] : '?',
-            loginId: member.login_id,
-            role: member.role || 'member'
-          })
-
-          channel = supabase.channel('room_presence', {
-            config: { presence: { key: member.login_id } },
-          })
-
-          channel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-              await channel.track({
-                user_id: member.login_id,
-                name: member.name,
-                position: member.position || '',
-                online_at: new Date().toISOString(),
-              })
-            }
-          })
-        }
-      }
-    }
-
-    initSidebar()
-
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel)
-      }
-    }
-  }, [])
 
   const handleLogout = async () => {
     try {

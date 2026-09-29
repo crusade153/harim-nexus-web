@@ -24,14 +24,13 @@ const legacyTypeMap = { 연차: 'annual_leave', 오전반차: 'am_half', 오후�
 const inputClass = 'w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white'
 
 export default function CalendarPage({ schedules = [], tasks = [], attendance = [], attendanceAvailable = true, members = [], currentUser, onRefresh, currentDate, onMonthChange }) {
-  const [selectedDate, setSelectedDate] = useState(null)
   const [modalType, setModalType] = useState(null)
   const [onlyMine, setOnlyMine] = useState(false)
   const [visible, setVisible] = useState({ task: true, schedule: true, attendance: true })
   const [saving, setSaving] = useState(false)
   const currentMemberId = String(currentUser?.ID || '')
   const isAdmin = currentUser?.역할 === 'admin'
-  const [scheduleForm, setScheduleForm] = useState({ 유형: '회의', 내용: '', 시간: '09:00', 대상자: [] })
+  const [scheduleForm, setScheduleForm] = useState({ 유형: '회의', 내용: '', 날짜: '', 시간: '09:00', 대상자: [] })
   const [attendanceForm, setAttendanceForm] = useState({ memberId: currentMemberId, eventType: 'annual_leave', startDate: '', endDate: '', startTime: '', endTime: '', unitDays: 1, note: '' })
 
   const monthStart = startOfMonth(currentDate)
@@ -66,10 +65,9 @@ export default function CalendarPage({ schedules = [], tasks = [], attendance = 
 
   const openModal = (date, type) => {
     const dateKey = format(date, 'yyyy-MM-dd')
-    setSelectedDate(date)
     setModalType(type)
     if (type === 'attendance') setAttendanceForm({ memberId: currentMemberId, eventType: 'annual_leave', startDate: dateKey, endDate: dateKey, startTime: '', endTime: '', unitDays: 1, note: '' })
-    else setScheduleForm({ 유형: '회의', 내용: '', 시간: '09:00', 대상자: [] })
+    else setScheduleForm({ 유형: '회의', 내용: '', 날짜: dateKey, 시간: '09:00', 대상자: [] })
   }
 
   const selectView = mode => {
@@ -82,20 +80,31 @@ export default function CalendarPage({ schedules = [], tasks = [], attendance = 
 
   const saveSchedule = async () => {
     if (!scheduleForm.내용.trim()) return toast.error('일정 내용을 입력해주세요.')
+    if (!scheduleForm.날짜) return toast.error('일정 날짜를 선택해주세요.')
     setSaving(true)
     try {
-      await createSchedule({ ...scheduleForm, 세부유형: '팀일정', 날짜: format(selectedDate, 'yyyy-MM-dd'), 대상자: scheduleForm.대상자.length ? scheduleForm.대상자.join(', ') : '전체' })
-      toast.success('팀 일정을 등록했습니다.'); setModalType(null); await onRefresh()
+      await createSchedule({ ...scheduleForm, 세부유형: '팀일정', 대상자: scheduleForm.대상자.length ? scheduleForm.대상자.join(', ') : '전체' })
+      toast.success('팀 일정을 등록했습니다.'); setModalType(null)
+      setVisible(value => ({ ...value, schedule: true }))
+      setOnlyMine(false)
+      if (scheduleForm.날짜.slice(0, 7) !== format(currentDate, 'yyyy-MM')) onMonthChange(new Date(`${scheduleForm.날짜}T12:00:00`))
+      else await onRefresh()
     } catch (error) { toast.error(error.message || '일정을 등록하지 못했습니다.') }
     finally { setSaving(false) }
   }
 
   const saveAttendance = async () => {
     if (!attendanceForm.memberId) return toast.error('대상 팀원을 선택해주세요.')
+    if (!attendanceForm.startDate || !attendanceForm.endDate || attendanceForm.endDate < attendanceForm.startDate) return toast.error('근태 시작일과 종료일을 확인해주세요.')
+    if (!(Number(attendanceForm.unitDays) > 0)) return toast.error('차감 일수를 확인해주세요.')
     setSaving(true)
     try {
       await createAttendanceEvent(attendanceForm)
-      toast.success('근태 일정을 등록했습니다.'); setModalType(null); await onRefresh()
+      toast.success('근태 일정을 등록했습니다.'); setModalType(null)
+      setVisible(value => ({ ...value, attendance: true }))
+      if (attendanceForm.memberId !== currentMemberId) setOnlyMine(false)
+      if (attendanceForm.startDate.slice(0, 7) !== format(currentDate, 'yyyy-MM')) onMonthChange(new Date(`${attendanceForm.startDate}T12:00:00`))
+      else await onRefresh()
     } catch (error) { toast.error(error.message || '근태 일정을 등록하지 못했습니다.') }
     finally { setSaving(false) }
   }
@@ -128,8 +137,8 @@ export default function CalendarPage({ schedules = [], tasks = [], attendance = 
             {[['all', '통합'], ['work', '업무만'], ['attendance', '근태만']].map(([id, label]) => <button key={id} onClick={() => selectView(id)} className={`rounded-lg px-3 py-2 text-xs font-bold ${currentView === id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{label}</button>)}
           </div>
           <button onClick={() => setOnlyMine(value => !value)} className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${onlyMine ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30' : 'border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-800'}`}><UserRound size={14} className="mr-1 inline" />{onlyMine ? '내 일정 표시 중' : '내 일정만'}</button>
-          <button onClick={() => openModal(new Date(), 'schedule')} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"><Plus size={14} className="mr-1 inline" />팀 일정</button>
-          <button onClick={() => openModal(new Date(), 'attendance')} className="rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm"><Plus size={14} className="mr-1 inline" />근태 등록</button>
+          <button onClick={() => openModal(currentDate, 'schedule')} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"><Plus size={14} className="mr-1 inline" />팀 일정</button>
+          <button onClick={() => openModal(currentDate, 'attendance')} className="rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm"><Plus size={14} className="mr-1 inline" />근태 등록</button>
         </div>
       </div>
 
@@ -159,8 +168,8 @@ export default function CalendarPage({ schedules = [], tasks = [], attendance = 
         </div>
       </div>
 
-      {modalType && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"><div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-800"><div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700"><h3 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white"><CalendarDays size={18} className="text-indigo-500" />{selectedDate && format(selectedDate, 'M월 d일')} {modalType === 'attendance' ? '근태 등록' : '팀 일정 등록'}</h3><button onClick={() => setModalType(null)} className="p-2 text-slate-400"><X size={18} /></button></div>
-        {modalType === 'attendance' ? <div className="space-y-4 p-6"><div><label className="mb-2 block text-xs font-bold text-slate-500">근태 유형</label><div className="grid grid-cols-4 gap-2">{ATTENDANCE_TYPES.map(type => <button key={type.value} onClick={() => chooseAttendanceType(type.value)} className={`rounded-lg border px-2 py-2.5 text-xs font-bold ${attendanceForm.eventType === type.value ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 text-slate-500 dark:border-slate-600'}`}>{type.label}</button>)}</div></div>{isAdmin && <div><label className="mb-1 block text-xs font-bold text-slate-500">대상 팀원</label><select value={attendanceForm.memberId} onChange={e => setAttendanceForm({ ...attendanceForm, memberId: e.target.value })} className={inputClass}>{members.map(member => <option key={member.ID} value={member.ID}>{member.이름} · {member.직위}</option>)}</select></div>}<div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs font-bold text-slate-500">시작일</label><input type="date" value={attendanceForm.startDate} onChange={e => setAttendanceForm({ ...attendanceForm, startDate: e.target.value })} className={inputClass} /></div><div><label className="mb-1 block text-xs font-bold text-slate-500">종료일</label><input type="date" value={attendanceForm.endDate} onChange={e => setAttendanceForm({ ...attendanceForm, endDate: e.target.value })} className={inputClass} /></div></div><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs font-bold text-slate-500">차감 일수</label><input type="number" min="0.25" step="0.25" value={attendanceForm.unitDays} onChange={e => setAttendanceForm({ ...attendanceForm, unitDays: e.target.value })} className={inputClass} /></div><div><label className="mb-1 block text-xs font-bold text-slate-500">시작 시간</label><input type="time" value={attendanceForm.startTime} onChange={e => setAttendanceForm({ ...attendanceForm, startTime: e.target.value })} className={inputClass} /></div></div><div><label className="mb-1 block text-xs font-bold text-slate-500">메모(선택)</label><input value={attendanceForm.note} onChange={e => setAttendanceForm({ ...attendanceForm, note: e.target.value })} className={inputClass} /></div><button disabled={saving || !attendanceAvailable} onClick={saveAttendance} className="btn-primary w-full disabled:opacity-50">{saving ? '등록 중...' : '근태 등록'}</button></div> : <div className="space-y-4 p-6"><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs font-bold text-slate-500">유형</label><select value={scheduleForm.유형} onChange={e => setScheduleForm({ ...scheduleForm, 유형: e.target.value })} className={inputClass}><option>회의</option><option>교육</option><option>출장</option><option>파견</option><option>행사</option><option>마감</option></select></div><div><label className="mb-1 block text-xs font-bold text-slate-500">시간</label><div className="relative"><Clock size={15} className="absolute left-3 top-3 text-slate-400" /><input type="time" value={scheduleForm.시간} onChange={e => setScheduleForm({ ...scheduleForm, 시간: e.target.value })} className={`${inputClass} pl-9`} /></div></div></div><div><label className="mb-1 block text-xs font-bold text-slate-500">일정 내용</label><input value={scheduleForm.내용} onChange={e => setScheduleForm({ ...scheduleForm, 내용: e.target.value })} className={inputClass} /></div><div><label className="mb-2 block text-xs font-bold text-slate-500">참석자(미선택 시 전체)</label><div className="grid max-h-40 grid-cols-2 gap-1 overflow-y-auto rounded-xl border border-slate-200 p-2 dark:border-slate-700">{members.map(member => <label key={member.ID} className="flex items-center gap-2 rounded p-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"><input type="checkbox" checked={scheduleForm.대상자.includes(member.이름)} onChange={() => setScheduleForm(form => ({ ...form, 대상자: form.대상자.includes(member.이름) ? form.대상자.filter(name => name !== member.이름) : [...form.대상자, member.이름] }))} />{member.이름}</label>)}</div></div><button disabled={saving} onClick={saveSchedule} className="btn-primary w-full">{saving ? '등록 중...' : '일정 등록'}</button></div>}
+      {modalType && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"><div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-800"><div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700"><h3 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white"><CalendarDays size={18} className="text-indigo-500" />{modalType === 'attendance' ? '근태 등록' : '팀 일정 등록'}</h3><button onClick={() => setModalType(null)} className="p-2 text-slate-400"><X size={18} /></button></div>
+        {modalType === 'attendance' ? <div className="space-y-4 p-6"><div><label className="mb-2 block text-xs font-bold text-slate-500">근태 유형</label><div className="grid grid-cols-4 gap-2">{ATTENDANCE_TYPES.map(type => <button key={type.value} onClick={() => chooseAttendanceType(type.value)} className={`rounded-lg border px-2 py-2.5 text-xs font-bold ${attendanceForm.eventType === type.value ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 text-slate-500 dark:border-slate-600'}`}>{type.label}</button>)}</div></div>{isAdmin && <div><label className="mb-1 block text-xs font-bold text-slate-500">대상 팀원</label><select value={attendanceForm.memberId} onChange={e => setAttendanceForm({ ...attendanceForm, memberId: e.target.value })} className={inputClass}>{members.map(member => <option key={member.ID} value={member.ID}>{member.이름} · {member.직위}</option>)}</select></div>}<div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs font-bold text-slate-500">시작일</label><input type="date" value={attendanceForm.startDate} onChange={e => setAttendanceForm({ ...attendanceForm, startDate: e.target.value })} className={inputClass} /></div><div><label className="mb-1 block text-xs font-bold text-slate-500">종료일</label><input type="date" value={attendanceForm.endDate} onChange={e => setAttendanceForm({ ...attendanceForm, endDate: e.target.value })} className={inputClass} /></div></div><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs font-bold text-slate-500">차감 일수</label><input type="number" min="0.25" step="0.25" value={attendanceForm.unitDays} onChange={e => setAttendanceForm({ ...attendanceForm, unitDays: e.target.value })} className={inputClass} /></div><div><label className="mb-1 block text-xs font-bold text-slate-500">시작 시간</label><input type="time" value={attendanceForm.startTime} onChange={e => setAttendanceForm({ ...attendanceForm, startTime: e.target.value })} className={inputClass} /></div></div><div><label className="mb-1 block text-xs font-bold text-slate-500">메모(선택)</label><input value={attendanceForm.note} onChange={e => setAttendanceForm({ ...attendanceForm, note: e.target.value })} className={inputClass} /></div><button disabled={saving || !attendanceAvailable} onClick={saveAttendance} className="btn-primary w-full disabled:opacity-50">{saving ? '등록 중...' : '근태 등록'}</button></div> : <div className="space-y-4 p-6"><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs font-bold text-slate-500">유형</label><select value={scheduleForm.유형} onChange={e => setScheduleForm({ ...scheduleForm, 유형: e.target.value })} className={inputClass}><option>회의</option><option>교육</option><option>출장</option><option>파견</option><option>행사</option><option>마감</option></select></div><div><label className="mb-1 block text-xs font-bold text-slate-500">시간</label><div className="relative"><Clock size={15} className="absolute left-3 top-3 text-slate-400" /><input type="time" value={scheduleForm.시간} onChange={e => setScheduleForm({ ...scheduleForm, 시간: e.target.value })} className={`${inputClass} pl-9`} /></div></div></div><div><label className="mb-1 block text-xs font-bold text-slate-500">일정 날짜</label><input type="date" value={scheduleForm.날짜} onChange={e => setScheduleForm({ ...scheduleForm, 날짜: e.target.value })} className={inputClass} /></div><div><label className="mb-1 block text-xs font-bold text-slate-500">일정 내용</label><input value={scheduleForm.내용} onChange={e => setScheduleForm({ ...scheduleForm, 내용: e.target.value })} className={inputClass} /></div><div><label className="mb-2 block text-xs font-bold text-slate-500">참석자(미선택 시 전체)</label><div className="grid max-h-40 grid-cols-2 gap-1 overflow-y-auto rounded-xl border border-slate-200 p-2 dark:border-slate-700">{members.map(member => <label key={member.ID} className="flex items-center gap-2 rounded p-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"><input type="checkbox" checked={scheduleForm.대상자.includes(member.이름)} onChange={() => setScheduleForm(form => ({ ...form, 대상자: form.대상자.includes(member.이름) ? form.대상자.filter(name => name !== member.이름) : [...form.대상자, member.이름] }))} />{member.이름}</label>)}</div></div><button disabled={saving} onClick={saveSchedule} className="btn-primary w-full">{saving ? '등록 중...' : '일정 등록'}</button></div>}
       </div></div>}
     </div>
   )

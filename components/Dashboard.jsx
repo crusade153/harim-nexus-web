@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import {
   CheckCircle2, Clock, AlertCircle, Calendar, ArrowUpRight,
   Zap, Link as LinkIcon, Activity, Users, User, Plus, Pencil, Trash2, X, Save, ExternalLink
 } from 'lucide-react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { usePresence } from '@/components/PresenceProvider'
 import { entityUrl } from '@/lib/links'
 import toast from 'react-hot-toast'
 import { createQuickLink, updateQuickLink, deleteQuickLink } from '@/lib/sheets'
@@ -13,7 +13,8 @@ import { isAdmin as isAdminUser } from '@/lib/roles'
 
 
 export default function Dashboard({ data, onRefresh }) {
-  const [onlineUserIds, setOnlineUserIds] = useState(new Set())
+  const { people, connected } = usePresence()
+  const onlineMemberIds = useMemo(() => new Set(people.map(person => person.id)), [people])
 
   // 내 아이디/이름 확인
   const myLoginId = data?.currentUser?.아이디
@@ -33,26 +34,6 @@ export default function Dashboard({ data, onRefresh }) {
   const [editingQuickLinkId, setEditingQuickLinkId] = useState(null)
   const [editingQuickLinkForm, setEditingQuickLinkForm] = useState({ 이름: '', URL: '' })
 
-  useEffect(() => {
-    // 채널명은 Sidebar와 동일해야 함
-    const channel = supabase.channel('room_presence')
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const newState = channel.presenceState()
-        const userIds = new Set()
-        for (const id in newState) {
-          userIds.add(id)
-        }
-        setOnlineUserIds(userIds)
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
   const summary = useMemo(() => {
     const rawTasks = data?.tasks || []
     const rawMembers = data?.members || []
@@ -63,11 +44,10 @@ export default function Dashboard({ data, onRefresh }) {
       : rawTasks
 
     const members = rawMembers.map(m => {
-      const isMe = m.아이디 === myLoginId
-      const isOnline = onlineUserIds.has(m.아이디)
+      const isOnline = onlineMemberIds.has(String(m.ID))
       return {
         ...m,
-        상태: (isMe || isOnline) ? '온라인' : '오프라인'
+        상태: connected ? (isOnline ? '온라인' : '오프라인') : '확인 중'
       }
     })
 
@@ -88,7 +68,7 @@ export default function Dashboard({ data, onRefresh }) {
       quickLinks: data?.quickLinks || [],
       members: members
     }
-  }, [data, onlineUserIds, myLoginId, myName, viewMode])
+  }, [connected, data, onlineMemberIds, myMemberId, myName, viewMode])
 
   // ---- 퀵링크 관리 핸들러 (관리자 전용) ----
   const openLinkModal = (link = null) => {
@@ -230,7 +210,7 @@ export default function Dashboard({ data, onRefresh }) {
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">{viewMode === 'mine' ? '내 업무 수' : '팀원 상태'}</p>
             <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-              {viewMode === 'mine' ? `${summary.totalTasks}건` : `${summary.onlineMembers}/${summary.totalMembers}명 온라인`}
+              {viewMode === 'mine' ? `${summary.totalTasks}건` : connected ? `${summary.onlineMembers}/${summary.totalMembers}명 온라인` : '접속 상태 확인 중'}
             </p>
           </div>
         </div>

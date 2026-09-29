@@ -6,12 +6,14 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import SectionTabs from '@/components/SectionTabs'
 import CompletionCheckHost from '@/components/CompletionCheck'
+import { PresenceProvider } from '@/components/PresenceProvider'
 import { supabase } from '@/lib/supabase'
 
 export default function MainLayout({ children }) {
   const router = useRouter()
   const [isSidebarHidden, setIsSidebarHidden] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
+  const [member, setMember] = useState(null)
 
   useEffect(() => {
     setIsSidebarHidden(localStorage.getItem('nexus_sidebar_hidden') === 'true')
@@ -24,7 +26,7 @@ export default function MainLayout({ children }) {
       }
       const { data: member } = await supabase
         .from('members')
-        .select('approved, status')
+        .select('id,name,position,login_id,role,approved,status')
         .eq('auth_id', user.id)
         .maybeSingle()
       if (!member || member.approved !== true || member.status === 'pending') {
@@ -32,6 +34,7 @@ export default function MainLayout({ children }) {
         router.replace('/login')
         return
       }
+      setMember(member)
       setAuthChecked(true)
     }
     checkAccess()
@@ -45,13 +48,14 @@ export default function MainLayout({ children }) {
     })
   }
 
-  if (!authChecked) {
+  if (!authChecked || !member) {
     return <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-sm text-slate-500">로그인 상태를 확인하고 있습니다...</div>
   }
 
   return (
+    <PresenceProvider member={member}>
     <div className="nexus-app-shell min-h-screen flex transition-colors duration-200">
-      <Sidebar isHidden={isSidebarHidden} onToggleHidden={toggleSidebar} />
+      <Sidebar member={member} isHidden={isSidebarHidden} onToggleHidden={toggleSidebar} />
       <main className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${isSidebarHidden ? 'lg:ml-0' : 'lg:ml-[240px]'}`}>
         <Suspense fallback={<div className="h-16 bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700" />}>
           <Header isSidebarHidden={isSidebarHidden} onToggleSidebar={toggleSidebar} />
@@ -65,5 +69,6 @@ export default function MainLayout({ children }) {
       </main>
       <CompletionCheckHost />
     </div>
+    </PresenceProvider>
   )
 }
