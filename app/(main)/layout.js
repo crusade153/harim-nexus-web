@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
+import SectionTabs from '@/components/SectionTabs'
 import { supabase } from '@/lib/supabase'
 
 export default function MainLayout({ children }) {
@@ -55,6 +56,7 @@ export default function MainLayout({ children }) {
           <Header isSidebarHidden={isSidebarHidden} onToggleSidebar={toggleSidebar} />
         </Suspense>
         <div className="flex-1 p-4 lg:p-8 max-w-[1920px] mx-auto w-full">
+          <SectionTabs />
           {children}
         </div>
       </main>

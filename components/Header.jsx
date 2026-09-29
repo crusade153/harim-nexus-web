@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, Bell, Settings, Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import SettingsModal from './SettingsModal' // ✅ [추가] 모달 import
 import { getUnreadNotificationCount } from '@/lib/work-os'
+import QuickAdd from './QuickAdd'
 
 export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
   const [isDark, setIsDark] = useState(false)
@@ -20,10 +21,18 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
     setSearchValue(searchParams.get('q') || searchParams.get('search') || '')
   }, [searchParams])
 
+  // 미확인 알림 수: 처음, 1분마다, 창으로 돌아올 때 다시 센다
   useEffect(() => {
     let active = true
-    getUnreadNotificationCount().then(count => { if (active) setUnreadCount(count) })
-    return () => { active = false }
+    const refresh = () => getUnreadNotificationCount().then(count => { if (active) setUnreadCount(count) })
+    refresh()
+    const timer = window.setInterval(refresh, 60000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+    }
   }, [])
 
   useEffect(() => {
@@ -95,6 +104,7 @@ export default function Header({ isSidebarHidden = false, onToggleSidebar }) {
           </form>
 
           <div className="flex items-center gap-2">
+            <QuickAdd />
             <button 
               onClick={toggleTheme}
               className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"

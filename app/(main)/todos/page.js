@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import TodoListPage from '@/components/TodoListPage'
 import Skeleton from '@/components/Skeleton'
 import { getRealData } from '@/lib/sheets'
+import { TASKS_CHANGED_EVENT } from '@/lib/links'
 
 function TodosContent() {
   const searchParams = useSearchParams()
@@ -18,6 +19,11 @@ function TodosContent() {
   }
 
   useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    const reload = () => loadData()
+    window.addEventListener(TASKS_CHANGED_EVENT, reload)
+    return () => window.removeEventListener(TASKS_CHANGED_EVENT, reload)
+  }, [])
 
   const filteredProjects = useMemo(() => {
     if (!data) return []

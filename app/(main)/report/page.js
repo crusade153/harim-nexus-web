@@ -4,8 +4,8 @@ import { ShieldAlert } from 'lucide-react'
 import ExecutiveReport from '@/components/ExecutiveReport'
 import Skeleton from '@/components/Skeleton'
 import { getRealData } from '@/lib/sheets'
+import { isAdmin as isAdminUser } from '@/lib/roles'
 
-const SYS_ADMIN_ID = 'crusade153'
 
 export default function ReportPage() {
   const [data, setData] = useState(null)
@@ -23,7 +23,7 @@ export default function ReportPage() {
   if (loading || !data) return <Skeleton />
 
   // 관리자(팀장) 전용 화면
-  if (data.currentUser?.아이디 !== SYS_ADMIN_ID) {
+  if (!isAdminUser(data.currentUser)) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center py-20">
         <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-4">

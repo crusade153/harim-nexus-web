@@ -8,6 +8,7 @@ import { getRealData } from '@/lib/sheets' // ✅ 여기 수정됨! (getSampleDa
 function BoardContent() {
   const searchParams = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
+  const initialPostId = searchParams.get('post')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -38,6 +39,7 @@ function BoardContent() {
       posts={filteredPosts} 
       currentUser={data.currentUser} 
       onRefresh={loadData} 
+      initialPostId={initialPostId}
     />
   )
 }

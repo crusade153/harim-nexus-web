@@ -3,11 +3,13 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import KanbanBoard from '@/components/KanbanBoard'
 import Skeleton from '@/components/Skeleton'
-import { getRealData } from '@/lib/sheets' 
+import { getRealData } from '@/lib/sheets'
+import { TASKS_CHANGED_EVENT } from '@/lib/links' 
 
 function KanbanContent() {
   const searchParams = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
+  const initialTaskId = searchParams.get('task')
   const [data, setData] = useState(null)
   
   // ✅ 로딩 상태 관리
@@ -20,6 +22,11 @@ function KanbanContent() {
   }
 
   useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    const reload = () => loadData()
+    window.addEventListener(TASKS_CHANGED_EVENT, reload)
+    return () => window.removeEventListener(TASKS_CHANGED_EVENT, reload)
+  }, [])
 
   const filteredTasks = useMemo(() => {
     if (!data) return []
@@ -38,6 +45,7 @@ function KanbanContent() {
       archives={data.archives} 
       currentUser={data.currentUser} // ✅ 유저 정보 전달
       onRefresh={loadData} 
+      initialTaskId={initialTaskId}
     />
   )
 }

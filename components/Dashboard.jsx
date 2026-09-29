@@ -4,11 +4,13 @@ import {
   CheckCircle2, Clock, AlertCircle, Calendar, ArrowUpRight,
   Zap, Link as LinkIcon, Activity, Users, User, Plus, Pencil, Trash2, X, Save, ExternalLink
 } from 'lucide-react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { entityUrl } from '@/lib/links'
 import toast from 'react-hot-toast'
 import { createQuickLink, updateQuickLink, deleteQuickLink } from '@/lib/sheets'
+import { isAdmin as isAdminUser } from '@/lib/roles'
 
-const SYS_ADMIN_ID = 'crusade153'
 
 export default function Dashboard({ data, onRefresh }) {
   const [onlineUserIds, setOnlineUserIds] = useState(new Set())
@@ -16,7 +18,10 @@ export default function Dashboard({ data, onRefresh }) {
   // 내 아이디/이름 확인
   const myLoginId = data?.currentUser?.아이디
   const myName = data?.currentUser?.이름
-  const isAdmin = myLoginId === SYS_ADMIN_ID
+  const myMemberId = data?.currentUser?.ID
+  const isAdmin = isAdminUser(data?.currentUser)
+  // 퀵링크는 팀원 누구나 추가·수정한다 (DB 권한도 동일)
+  const canEditLinks = Boolean(myLoginId)
 
   // 팀장은 팀 전체가 기본, 개인은 본인 업무가 기본
   const [viewMode, setViewMode] = useState(isAdmin ? 'team' : 'mine') // 'team' | 'mine'
@@ -54,7 +59,7 @@ export default function Dashboard({ data, onRefresh }) {
 
     // 개인 보기: 내 담당 업무만
     const scopeTasks = viewMode === 'mine'
-      ? rawTasks.filter(t => t.담당자명 === myName)
+      ? rawTasks.filter(t => (t.담당자ID ? t.담당자ID === myMemberId : t.담당자명 === myName))
       : rawTasks
 
     const members = rawMembers.map(m => {
@@ -271,7 +276,7 @@ export default function Dashboard({ data, onRefresh }) {
             </div>
             <div className="space-y-1">
               {summary.urgentTasks.concat(summary.ongoingTasks).slice(0, 6).map((task, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
+                <Link key={task.ID || i} href={entityUrl('task', task.ID)} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
                    <div className="flex items-center gap-3">
                      <span className={`w-1.5 h-1.5 rounded-full ${task.우선순위 === '높음' ? 'bg-red-500' : 'bg-green-500'}`} />
                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{task.제목}</span>
@@ -282,7 +287,7 @@ export default function Dashboard({ data, onRefresh }) {
                        {task.상태}
                      </span>
                    </div>
-                </div>
+                </Link>
               ))}
               {summary.urgentTasks.length + summary.ongoingTasks.length === 0 && (
                 <div className="text-center py-4 text-slate-400 text-sm">
@@ -300,14 +305,14 @@ export default function Dashboard({ data, onRefresh }) {
               <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <LinkIcon size={18} className="text-indigo-500" /> 퀵 링크
               </h3>
-              {isAdmin && (
+              {canEditLinks && (
                 <button onClick={() => openLinkModal()} title="상세 입력 모달" className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg">
                   <Plus size={14} /> 모달
                 </button>
               )}
             </div>
 
-            {isAdmin && (
+            {canEditLinks && (
               <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 dark:border-indigo-500/20 dark:bg-indigo-500/10">
                 <div className="grid grid-cols-1 gap-2">
                   <input
@@ -367,7 +372,7 @@ export default function Dashboard({ data, onRefresh }) {
                     </a>
                   )}
                   {/* 관리자 전용: 링크 수정/삭제 */}
-                  {isAdmin && editingQuickLinkId !== link.ID && (
+                  {canEditLinks && editingQuickLinkId !== link.ID && (
                     <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openInlineEditLink(link)} title="바로 수정" className="p-1 rounded bg-white/90 dark:bg-slate-700 text-slate-500 hover:text-indigo-600 shadow-sm"><Pencil size={11} /></button>
                       <button onClick={() => handleDeleteLink(link)} title="삭제" className="p-1 rounded bg-white/90 dark:bg-slate-700 text-slate-500 hover:text-red-500 shadow-sm"><Trash2 size={11} /></button>
@@ -377,7 +382,7 @@ export default function Dashboard({ data, onRefresh }) {
               ))}
               {summary.quickLinks.length === 0 && (
                 <div className="col-span-2 text-center py-4 text-slate-400 text-xs">
-                  {isAdmin ? "'추가' 버튼으로 공유 링크를 등록하세요." : '등록된 링크가 없습니다.'}
+                  {canEditLinks ? "'추가' 버튼으로 공유 링크를 등록하세요." : '등록된 링크가 없습니다.'}
                 </div>
               )}
             </div>
@@ -410,7 +415,7 @@ export default function Dashboard({ data, onRefresh }) {
       </div>
 
       {/* 관리자 전용: 퀵링크 추가/수정 모달 */}
-      {isAdmin && linkModal && (
+      {canEditLinks && linkModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-5">

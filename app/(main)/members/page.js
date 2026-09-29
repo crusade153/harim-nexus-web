@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import MembersPage from '@/components/MembersPage'
 import Skeleton from '@/components/Skeleton'
 import { adminGetMembers, getRealData } from '@/lib/sheets' // ✅ 진짜 데이터 가져오기
+import { isAdmin as isAdminUser } from '@/lib/roles'
 
 export default function MembersRoutePage() {
   const [data, setData] = useState(null)
@@ -12,7 +13,7 @@ export default function MembersRoutePage() {
     setLoading(true)
     // ✅ 실제 DB 데이터 로드
     const dbData = await getRealData({ sections: ['members', 'tasks', 'projects'] })
-    if (dbData.currentUser?.역할 === 'admin' || dbData.currentUser?.아이디 === 'crusade153') {
+    if (isAdminUser(dbData.currentUser)) {
       try {
         dbData.members = await adminGetMembers()
       } catch (error) {

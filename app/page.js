@@ -1,9 +1,21 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowRight, LayoutDashboard, Calendar, Book, Users, ShieldCheck, Zap } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 export default function LandingPage() {
+  const router = useRouter()
+
+  // 이미 로그인한 사람은 소개 화면을 건너뛰고 바로 대시보드로 간다
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) router.replace('/dashboard')
+    })
+  }, [router])
+
   return (
     // h-screen과 overflow-hidden으로 스크롤을 원천 차단하여 '한 페이지' 느낌 구현
     <div className="h-screen bg-slate-950 flex flex-col font-sans overflow-hidden selection:bg-indigo-500/30 relative">

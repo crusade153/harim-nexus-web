@@ -4,8 +4,9 @@ import toast from 'react-hot-toast'
 import { X, Image as ImageIcon, Search, MessageSquare, Trash2, Edit2 } from 'lucide-react'
 import { createPost, createComment, deletePost, updatePost, deleteComment } from '@/lib/sheets'
 import { uploadWorkspaceFile } from '@/lib/work-os'
+import { isAdmin as isAdminUser } from '@/lib/roles'
 
-export default function BoardPage({ posts, currentUser, onRefresh }) {
+export default function BoardPage({ posts, currentUser, onRefresh, initialPostId = null }) {
   const [filter, setFilter] = useState('전체')
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false)
   const [selectedPost, setSelectedPost] = useState(null)
@@ -15,7 +16,16 @@ export default function BoardPage({ posts, currentUser, onRefresh }) {
   const [newPost, setNewPost] = useState({ 제목: '', 태그: '일반', 내용: '', 첨부파일: null })
   const [commentInput, setCommentInput] = useState('')
 
-  const isAdmin = currentUser?.아이디 === 'crusade153'
+  const isAdmin = isAdminUser(currentUser)
+
+  // /board?post=ID 로 들어오면 그 글을 연다 (최초 1회)
+  const [openedInitialPost, setOpenedInitialPost] = useState(false)
+  useEffect(() => {
+    if (openedInitialPost || !initialPostId) return
+    const target = posts?.find(post => post.ID === String(initialPostId))
+    if (target) setSelectedPost(target)
+    setOpenedInitialPost(true)
+  }, [initialPostId, posts, openedInitialPost])
 
   useEffect(() => {
     if (selectedPost) {

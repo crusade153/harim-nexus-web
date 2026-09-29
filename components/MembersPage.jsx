@@ -3,12 +3,11 @@ import { useState } from 'react'
 import { Mail, Calendar, ShieldCheck, Crown, Settings2, Trash2, Check, X, UserCheck, KeyRound, Shuffle, Copy, UserPlus, Link2Off, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminCreateMember, adminUpdateMember, adminApproveMember, adminDeleteMember, adminResetMemberPassword } from '@/lib/sheets'
+import { isAdmin as isAdminUser, isSystemAdmin } from '@/lib/roles'
+import { isValidPin, PIN_RULE_MESSAGE } from '@/lib/auth-id'
 
-// 사람이 부르고 받아적기 쉬운 임시 비밀번호 (헷갈리는 0/O, 1/l 제외)
-const generateTempPassword = () => {
-  const chars = 'abcdefghijkmnpqrstuvwxyz23456789'
-  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-}
+// 임시 PIN (숫자 6자리)
+const generateTempPassword = () => Array.from({ length: 6 }, () => Math.floor(Math.random() * 10)).join('')
 
 // 업무부하 계산 로직
 const calculateWorkload = (member, tasks, projects) => {
@@ -33,8 +32,7 @@ const STATUS_OPTIONS = [
 
 export default function MembersPage({ members, tasks, projects, currentUser, onRefresh }) {
   // 관리자 ID 정의
-  const SYS_ADMIN_ID = 'crusade153'
-  const isAdmin = currentUser?.역할 === 'admin' || currentUser?.아이디 === SYS_ADMIN_ID
+  const isAdmin = isAdminUser(currentUser)
 
   const [editingMember, setEditingMember] = useState(null)
   const [isCreating, setIsCreating] = useState(false)
@@ -74,7 +72,7 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
   }
 
   const handleResetPassword = async () => {
-    if (newPassword.length < 8) return toast.error('비밀번호는 8자 이상이어야 합니다.')
+    if (!isValidPin(newPassword)) return toast.error(PIN_RULE_MESSAGE)
     if (!confirm(`${editingMember.이름}님의 비밀번호를 새로 설정합니다.\n기존 비밀번호는 즉시 사용할 수 없게 됩니다.`)) return
 
     setPwSaving(true)
@@ -97,7 +95,7 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
     if (!form.아이디 || !form.이름) return toast.error('아이디와 이름을 입력하세요.')
     try {
       if (isCreating) {
-        if (form.비밀번호.length < 8) return toast.error('초기 비밀번호는 8자 이상이어야 합니다.')
+        if (!isValidPin(form.비밀번호)) return toast.error(PIN_RULE_MESSAGE)
         await adminCreateMember(form)
         toast.success(`${form.이름}님의 로그인 계정과 회원 정보가 생성되었습니다.`)
       } else {
@@ -119,7 +117,7 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
   }
 
   const handleDelete = async (m) => {
-    if (m.아이디 === SYS_ADMIN_ID) return toast.error('관리자 계정은 삭제할 수 없습니다.')
+    if (isSystemAdmin(m)) return toast.error('관리자 계정은 삭제할 수 없습니다.')
     if (!confirm(`${m.이름}님을 팀에서 삭제하시겠습니까?\n삭제 후 해당 계정은 로그인할 수 없습니다.`)) return
     try {
       await adminDeleteMember(m.ID)
@@ -157,7 +155,7 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
         {members?.map((member, index) => {
           const workload = calculateWorkload(member, tasks, projects)
           // 시스템 관리자 확인
-          const isSysAdmin = member.아이디 === SYS_ADMIN_ID
+          const isSysAdmin = isSystemAdmin(member)
           const isPending = member.상태 === 'pending'
 
           return (
@@ -352,7 +350,7 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
               {/* 비밀번호 재설정 */}
               {isCreating ? (
                 <div className="pt-4 mt-2 border-t border-dashed border-slate-200 dark:border-slate-700 space-y-2">
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase"><KeyRound size={13} className="text-amber-500" /> 초기 비밀번호</label>
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase"><KeyRound size={13} className="text-amber-500" /> 초기 PIN (숫자 6자리)</label>
                   <div className="flex gap-2">
                     <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 dark:text-white text-sm font-mono" value={form.비밀번호} onChange={e => setForm({ ...form, 비밀번호: e.target.value })} />
                     <button type="button" onClick={() => setShowPassword(value => !value)} title={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} className="px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-600">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
@@ -370,7 +368,7 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 dark:text-white text-sm font-mono"
-                    placeholder="새 비밀번호 (8자 이상)"
+                    placeholder="새 PIN (숫자 6자리)" inputMode="numeric" maxLength={6}
                     value={newPassword}
                     onChange={e => setNewPassword(e.target.value)}
                   />
@@ -393,7 +391,7 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
                   <button
                     type="button"
                     onClick={handleResetPassword}
-                    disabled={pwSaving || newPassword.length < 8}
+                    disabled={pwSaving || !isValidPin(newPassword)}
                     className="px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
                   >
                     {pwSaving ? '적용 중...' : '적용'}
@@ -430,7 +428,7 @@ export default function MembersPage({ members, tasks, projects, currentUser, onR
             </div>
 
             <div className="flex justify-between items-center mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
-              {!isCreating && editingMember?.아이디 !== SYS_ADMIN_ID ? (
+              {!isCreating && !isSystemAdmin(editingMember) ? (
                 <button onClick={() => handleDelete(editingMember)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 px-3 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
                   <Trash2 size={15} /> 팀에서 삭제
                 </button>

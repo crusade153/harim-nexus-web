@@ -15,6 +15,7 @@ import {
   uploadWorkspaceFile
 } from '@/lib/work-os'
 import { classifyDueDate } from '@/lib/work-os-utils.mjs'
+import { entityUrl, TASKS_CHANGED_EVENT } from '@/lib/links'
 
 const tabItems = [
   { id: 'my', label: 'My Work', icon: BriefcaseBusiness },
@@ -76,6 +77,10 @@ export default function WorkHub({ initialTab = 'my', initialQuery = '' }) {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    window.addEventListener(TASKS_CHANGED_EVENT, load)
+    return () => window.removeEventListener(TASKS_CHANGED_EVENT, load)
+  }, [load])
   useEffect(() => {
     if (initialQuery.trim().length >= 2) runSearch(initialQuery)
   // 최초 진입 검색어만 처리한다.
@@ -166,7 +171,7 @@ function MyWork({ tasks }) {
 
 function TaskGroup({ title, items, tone, empty }) {
   const tones = { rose: 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300', amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300', indigo: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300' }
-  return <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800"><div className="mb-4 flex items-center justify-between"><h3 className="font-bold text-slate-800 dark:text-white">{title}</h3><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${tones[tone]}`}>{items.length}</span></div><div className="space-y-2">{items.length === 0 ? <p className="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-400 dark:bg-slate-800/50">{empty}</p> : items.map(task => <Link key={task.id} href="/kanban" className="block rounded-xl border border-slate-100 p-3 transition hover:border-indigo-200 hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-indigo-950/20"><div className="flex items-start justify-between gap-3"><strong className="text-sm text-slate-800 dark:text-slate-100">{task.title}</strong><span className="shrink-0 text-[11px] text-slate-400">{formatDate(task.due_date)}</span></div><p className="mt-2 line-clamp-2 text-xs text-slate-500">{task.content || '업무 설명 없음'}</p><div className="mt-3 flex items-center gap-2 text-[11px]"><span className="rounded bg-slate-100 px-2 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{task.status}</span><span className="text-slate-400">{task.priority}</span></div></Link>)}</div></section>
+  return <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800"><div className="mb-4 flex items-center justify-between"><h3 className="font-bold text-slate-800 dark:text-white">{title}</h3><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${tones[tone]}`}>{items.length}</span></div><div className="space-y-2">{items.length === 0 ? <p className="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-400 dark:bg-slate-800/50">{empty}</p> : items.map(task => <Link key={task.id} href={entityUrl('task', task.id)} className="block rounded-xl border border-slate-100 p-3 transition hover:border-indigo-200 hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-indigo-950/20"><div className="flex items-start justify-between gap-3"><strong className="text-sm text-slate-800 dark:text-slate-100">{task.title}</strong><span className="shrink-0 text-[11px] text-slate-400">{formatDate(task.due_date)}</span></div><p className="mt-2 line-clamp-2 text-xs text-slate-500">{task.content || '업무 설명 없음'}</p><div className="mt-3 flex items-center gap-2 text-[11px]"><span className="rounded bg-slate-100 px-2 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{task.status}</span><span className="text-slate-400">{task.priority}</span></div></Link>)}</div></section>
 }
 
 function Notifications({ data, onReload }) {

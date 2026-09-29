@@ -2,25 +2,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { 
-  LayoutDashboard, 
-  KanbanSquare, 
-  CheckSquare, 
-  Archive, 
-  CalendarDays, 
-  Users, 
-  Menu, 
-  X, 
-  LogOut, 
-  Megaphone,
-  GanttChartSquare,
-  FileBarChart2,
-  PanelLeftClose,
-  Network,
-  BriefcaseBusiness
-} from 'lucide-react'
+import { Menu, X, LogOut, PanelLeftClose } from 'lucide-react'
+import { NAV_SECTIONS, findSection } from '@/lib/nav'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
+import { isAdmin as isAdminUser } from '@/lib/roles'
 
 export default function Sidebar({ isHidden = false, onToggleHidden }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -29,25 +15,9 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
 
   const [myProfile, setMyProfile] = useState({ name: '', position: '', initial: '', loginId: '', role: 'member' })
 
-  const menuItems = [
-    { id: 'dashboard', name: '대시보드', icon: LayoutDashboard, path: '/dashboard' },
-    { id: 'work', name: '업무 허브', icon: BriefcaseBusiness, badge: 'My Work', path: '/work' },
-    { id: 'kanban', name: '업무 보드', icon: KanbanSquare, path: '/kanban' }, 
-    // ✅ [수정됨] 이름: 프로젝트 WBS / 배지: Schedule
-    { id: 'timeline', name: '프로젝트 WBS', icon: GanttChartSquare, badge: 'Schedule', path: '/timeline' },
-    { id: 'todos', name: '프로젝트 & To-Do', icon: CheckSquare, badge: 'Action', path: '/todos' }, 
-    { id: 'board', name: '게시판 & 이슈', icon: Megaphone, badge: 'New', path: '/board' },
-    { id: 'archive', name: '팀 아카이브', icon: Archive, path: '/archive' }, 
-    { id: 'calendar', name: '캘린더', icon: CalendarDays, path: '/calendar' },
-    { id: 'organization', name: '조직 · MBO', icon: Network, badge: 'RACI', path: '/organization' },
-    { id: 'members', name: '팀원 관리', icon: Users, path: '/members' },
-    // 팀장(관리자) 전용: 경영진 보고 리포트
-    { id: 'report', name: '경영진 보고', icon: FileBarChart2, badge: 'Admin', path: '/report', adminOnly: true },
-  ]
-
-  const SYS_ADMIN_ID = 'crusade153'
-  const isAdmin = myProfile.role === 'admin' || myProfile.loginId === SYS_ADMIN_ID
-  const visibleMenuItems = menuItems.filter(item => !item.adminOnly || isAdmin)
+  const isAdmin = isAdminUser(myProfile)
+  const visibleSections = NAV_SECTIONS.filter(section => !section.adminOnly || isAdmin)
+  const activeSectionId = findSection(pathname)?.id
 
   useEffect(() => {
     let channel = null;
@@ -135,14 +105,15 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
 
         <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
           <p className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Menu</p>
-          {visibleMenuItems.map((item) => {
-            const isActive = pathname === item.path
-            const Icon = item.icon
+          {visibleSections.map((section) => {
+            const isActive = section.id === activeSectionId
+            const Icon = section.icon
             return (
               <Link
-                key={item.id}
-                href={item.path}
+                key={section.id}
+                href={section.tabs[0].path}
                 onClick={() => setIsMobileOpen(false)}
+                aria-current={isActive ? 'page' : undefined}
                 className={`
                   w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all group
                   ${isActive 
@@ -153,9 +124,9 @@ export default function Sidebar({ isHidden = false, onToggleHidden }) {
               >
                 <div className="flex items-center gap-3">
                   <Icon size={18} className={isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'} />
-                  <span>{item.name}</span>
+                  <span>{section.name}</span>
                 </div>
-                {item.badge && <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] px-1.5 py-0.5 rounded font-bold">{item.badge}</span>}
+                {section.adminOnly && <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] px-1.5 py-0.5 rounded font-bold">Admin</span>}
               </Link>
             )
           })}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getAdminClient } from '@/lib/supabase-admin'
 import { lookup } from 'node:dns/promises'
 import net from 'node:net'
 
@@ -33,11 +33,10 @@ async function assertSafeWebhookUrl(rawUrl) {
   return url
 }
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('서버 자동화 환경 변수가 설정되지 않았습니다.')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+function getRequiredAdminClient() {
+  const admin = getAdminClient()
+  if (!admin) throw new Error('서버 자동화 환경 변수가 설정되지 않았습니다.')
+  return admin
 }
 
 function matchesConditions(conditions, eventPayload) {
@@ -152,7 +151,7 @@ export async function POST(request) {
   try {
     const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
     if (!token) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
-    const admin = getAdminClient()
+    const admin = getRequiredAdminClient()
 
     const { data: userData, error: userError } = await admin.auth.getUser(token)
     if (userError || !userData.user) return NextResponse.json({ error: '세션이 유효하지 않습니다.' }, { status: 401 })

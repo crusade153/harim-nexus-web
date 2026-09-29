@@ -18,6 +18,7 @@ import { CSS } from '@dnd-kit/utilities'
 
 import Drawer from '@/components/ui/Drawer'
 import { updateTaskStatus, createTask, createComment, deleteTask, updateTask } from '@/lib/sheets'
+import { isAdmin as isAdminUser } from '@/lib/roles'
 
 // 1. 충돌 감지 알고리즘
 function customCollisionDetection(args) {
@@ -121,7 +122,7 @@ function KanbanColumn({ id, title, count, totalCount, isExpanded, onToggle, chil
 }
 
 // 4. 메인 칸반 보드 컴포넌트
-export default function KanbanBoard({ tasks: initialTasks, archives = [], currentUser, onRefresh }) {
+export default function KanbanBoard({ tasks: initialTasks, archives = [], currentUser, onRefresh, initialTaskId = null }) {
   const [items, setItems] = useState(initialTasks)
   const [selectedTask, setSelectedTask] = useState(null)
   const [activeId, setActiveId] = useState(null)
@@ -133,13 +134,22 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
 
   const [onlyMyTasks, setOnlyMyTasks] = useState(false)
   const currentUserName = currentUser?.이름 || '게스트'
-  const isAdmin = currentUser?.아이디 === 'crusade153'
+  const isAdmin = isAdminUser(currentUser)
   
   const columns = ['대기', '진행중', '완료', '중단']
 
   useEffect(() => {
     setItems(initialTasks)
   }, [initialTasks])
+
+  // 알림·검색에서 /kanban?task=ID 로 들어오면 그 업무 상세를 연다 (최초 1회)
+  const [openedInitialTask, setOpenedInitialTask] = useState(false)
+  useEffect(() => {
+    if (openedInitialTask || !initialTaskId) return
+    const target = initialTasks.find(task => task.ID === String(initialTaskId))
+    if (target) setSelectedTask(target)
+    setOpenedInitialTask(true)
+  }, [initialTaskId, initialTasks, openedInitialTask])
 
   useEffect(() => {
     if(isTaskModalOpen && currentUser) {

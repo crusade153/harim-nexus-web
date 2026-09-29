@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
@@ -55,7 +56,7 @@ export default function LoginPage() {
       router.push('/dashboard')
     } catch (error) {
       console.error(error)
-      toast.error('로그인 실패: ID 또는 비밀번호를 확인하세요.')
+      toast.error('로그인 실패: 아이디 또는 PIN을 확인하세요.')
     } finally {
       setLoading(false)
     }
@@ -84,13 +85,15 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">비밀번호</label>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">PIN (숫자 6자리)</label>
             <input
               type="password"
+              inputMode="numeric"
+              maxLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white transition-all"
-              placeholder="••••••••"
+              placeholder="••••••"
               autoComplete="current-password"
               required
             />
@@ -105,8 +108,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-slate-400">
-          계정이 필요하신가요? 팀장에게 가입을 요청하세요.
+        <div className="mt-6 text-center text-sm text-slate-500">
+          처음이신가요? <Link href="/signup" className="font-bold text-indigo-600 hover:underline">가입하기</Link>
         </div>
       </div>
     </div>

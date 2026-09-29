@@ -4,24 +4,26 @@ import toast from 'react-hot-toast'
 import { Archive, Link as LinkIcon, ExternalLink, MessageSquare, Plus, X, Send, Trash2, Edit2 } from 'lucide-react'
 import Editor from '@/components/ui/Editor'
 import { createArchive, createComment, deleteArchive, updateArchive } from '@/lib/sheets'
+import { isAdmin as isAdminUser } from '@/lib/roles'
 
-export default function ArchivePage({ archives = [], currentUser, onRefresh }) {
+export default function ArchivePage({ archives = [], currentUser, onRefresh, initialDocId = null }) {
   const [selectedDoc, setSelectedDoc] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false) 
   const [newArchive, setNewArchive] = useState({ 카테고리: '매뉴얼', 제목: '', 링크: '', 내용: '' })
   const [commentInput, setCommentInput] = useState('')
   const categories = ['매뉴얼', '온보딩', '트러블슈팅', '기타']
-  const isAdmin = currentUser?.아이디 === 'crusade153'
+  const isAdmin = isAdminUser(currentUser)
 
   useEffect(() => {
     if (archives.length > 0 && !selectedDoc) {
-      setSelectedDoc(archives[0])
+      // /archive?doc=ID 로 들어오면 그 문서를, 아니면 첫 문서를 연다
+      setSelectedDoc(archives.find(doc => doc.ID === String(initialDocId)) || archives[0])
     } else if (selectedDoc) {
       const updated = archives.find(a => a.ID === selectedDoc.ID)
       if (updated) setSelectedDoc(updated)
     }
-  }, [archives, selectedDoc])
+  }, [archives, selectedDoc, initialDocId])
 
   const handleSave = async () => {
     if (!newArchive.제목) { toast.error('제목을 입력해주세요!'); return }

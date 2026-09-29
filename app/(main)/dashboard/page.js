@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Dashboard from '@/components/Dashboard'
 import Skeleton from '@/components/Skeleton'
 import { getRealData } from '@/lib/sheets' // ✅ getRealData 사용 (중요!)
+import { TASKS_CHANGED_EVENT } from '@/lib/links'
 
 function DashboardContent() {
   const searchParams = useSearchParams()
@@ -21,6 +22,12 @@ function DashboardContent() {
   }
 
   useEffect(() => { loadData() }, [])
+
+  useEffect(() => {
+    const reload = () => loadData()
+    window.addEventListener(TASKS_CHANGED_EVENT, reload)
+    return () => window.removeEventListener(TASKS_CHANGED_EVENT, reload)
+  }, [])
 
   const filteredData = useMemo(() => {
     if (!data) return null

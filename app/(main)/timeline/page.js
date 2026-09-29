@@ -137,7 +137,10 @@ export default function TimelinePage() {
     setMembers(data.members || [])
     setCurrentUser(data.currentUser)
     if (data.projects?.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(data.projects[0].ID)
+      // /timeline?project=ID 로 들어오면 그 프로젝트를 먼저 연다
+      const requested = new URLSearchParams(window.location.search).get('project')
+      const target = data.projects.find(project => project.ID === requested) || data.projects[0]
+      setSelectedProjectId(target.ID)
     }
     setLoading(false)
   }

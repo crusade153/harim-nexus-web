@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { updateMyProfile, changeMyPassword } from '@/lib/sheets'
 import { X, Save, Smile, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { isValidPin, PIN_RULE_MESSAGE } from '@/lib/auth-id'
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false)
@@ -61,7 +62,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   }
 
   const handleChangePassword = async () => {
-    if (newPassword.length < 8) return toast.error('비밀번호는 8자 이상이어야 합니다.')
+    if (!isValidPin(newPassword)) return toast.error(PIN_RULE_MESSAGE)
     if (newPassword !== confirmPassword) return toast.error('비밀번호 확인이 일치하지 않습니다.')
 
     setPwLoading(true)
@@ -140,7 +141,7 @@ export default function SettingsModal({ isOpen, onClose }) {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="새 비밀번호 (8자 이상)"
+              placeholder="새 PIN (숫자 6자리)" inputMode="numeric" maxLength={6}
               autoComplete="new-password"
               className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none dark:text-white transition-all text-sm"
             />
@@ -154,7 +155,7 @@ export default function SettingsModal({ isOpen, onClose }) {
             />
             <button
               onClick={handleChangePassword}
-              disabled={pwLoading || newPassword.length < 8}
+              disabled={pwLoading || !isValidPin(newPassword)}
               className="w-full py-2.5 rounded-xl border border-amber-300 dark:border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {pwLoading ? '변경 중...' : '비밀번호 변경'}

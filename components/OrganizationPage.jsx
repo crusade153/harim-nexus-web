@@ -10,6 +10,7 @@ import {
   deleteMboObjective, deleteOrgUnit, deleteWorkResponsibility,
   saveMboObjective, saveMemberRoleProfile, saveOrgUnit, saveWorkResponsibility,
 } from '@/lib/sheets'
+import { isAdmin as isAdminUser } from '@/lib/roles'
 
 const currentYear = new Date().getFullYear()
 const emptyUnit = { name: '', unit_type: 'team', parent_id: '', manager_member_id: '', description: '', sort_order: 0 }
@@ -64,7 +65,7 @@ export default function OrganizationPage({ data, currentMember, onRefresh }) {
   const [year, setYear] = useState(currentYear)
   const [memberFilter, setMemberFilter] = useState('all')
   const [saving, setSaving] = useState(false)
-  const isAdmin = currentMember?.role === 'admin' || currentMember?.login_id === 'crusade153'
+  const isAdmin = isAdminUser(currentMember)
 
   const memberMap = useMemo(() => Object.fromEntries(data.members.map(member => [String(member.id), member])), [data.members])
   const unitMap = useMemo(() => Object.fromEntries(data.units.map(unit => [String(unit.id), unit])), [data.units])

@@ -8,6 +8,7 @@ import { getRealData } from '@/lib/sheets'
 function ArchiveContent() {
   const searchParams = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
+  const initialDocId = searchParams.get('doc')
   const [data, setData] = useState(null)
   
   // ✅ 로딩 상태 관리 (깜빡임 방지용)
@@ -31,7 +32,7 @@ function ArchiveContent() {
 
   if (isInitialLoading || !data) return <Skeleton />
 
-  return <ArchivePage archives={filteredArchives} currentUser={data.currentUser} onRefresh={loadData} />
+  return <ArchivePage archives={filteredArchives} currentUser={data.currentUser} onRefresh={loadData} initialDocId={initialDocId} />
 }
 
 export default function ArchiveRoutePage() {
