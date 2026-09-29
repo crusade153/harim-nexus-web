@@ -7,7 +7,7 @@ export async function GET(request) {
   try {
     const { admin, isAdmin } = await requireNexusMember(request)
     const settings = checked(await admin.from('workspace_settings').select(isAdmin ? COLUMNS : 'ai_enabled,ai_mask_numbers').eq('workspace_id', WORKSPACE_ID).single())
-    return NextResponse.json({ settings, isAdmin, model: process.env.DEEPSEEK_MODEL || null, configured: Boolean(process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_MODEL) })
+    return NextResponse.json({ settings, isAdmin, configured: Boolean(process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_MODEL) })
   } catch (error) { return NextResponse.json(apiError(error), { status: error.status || 500 }) }
 }
 export async function POST(request) {

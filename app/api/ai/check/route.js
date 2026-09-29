@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireNexusMember, WORKSPACE_ID, checked, apiError } from '@/lib/nexus-server'
 import { runDeepSeek } from '@/lib/ai/deepseek'
 import { completionCheckMessages } from '@/lib/ai/prompts'
-import { tokenReservation } from '@/lib/ai/review-utils.mjs'
+import { tokenReservation, assistantMessage } from '@/lib/ai/review-utils.mjs'
 import { checkTaskSnapshot, defaultCheckQuestions, validateCheckQuestions } from '@/lib/ai/check-utils.mjs'
 import { flushChatNotifications } from '@/lib/google-chat'
 
@@ -83,10 +83,10 @@ async function prepare(admin, member, taskId) {
       })
       questions = result.questions; source = 'ai'; model = result.model
     } catch (error) {
-      notice = /상한|예산/.test(error.message || '') ? `${error.message} 기본 점검 질문으로 대신할게요.` : 'AI 친구가 지금 답하지 못해 기본 점검 질문으로 대신할게요.'
+      notice = /상한|예산/.test(error.message || '') ? `${assistantMessage(error.message)} 기본 점검 질문으로 대신할게요.` : '비서몬이 지금 답하지 못해 기본 점검 질문으로 대신할게요.'
     }
   } else {
-    notice = settings.ai_enabled ? '서버 AI 설정이 없어 기본 점검 질문을 드려요.' : 'AI 외부 전송이 꺼져 있어 기본 점검 질문을 드려요.'
+    notice = settings.ai_enabled ? '서버 비서몬 설정이 없어 기본 점검 질문을 드려요.' : '비서몬 외부 전송이 꺼져 있어 기본 점검 질문을 드려요.'
   }
   const inserted = checked(await admin.from('task_completion_checks').upsert({
     workspace_id: WORKSPACE_ID, task_id: task.id, member_id: member.id, task_version: task.updated_at,

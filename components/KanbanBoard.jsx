@@ -235,7 +235,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
       setItems(old => old.map(item => item.ID === taskId ? { ...item, 상태: newStatus } : item))
       setSelectedTask(old => old?.ID === taskId ? { ...old, 상태: newStatus } : old)
     }
-    // 완료는 AI 친구 점검 창에서 답변을 제출한 뒤에만 반영한다
+    // 완료는 비서몬 점검 창에서 답변을 제출한 뒤에만 반영한다
     if (newStatus !== '완료') apply()
     try {
         await updateTaskStatus(taskId, newStatus)
@@ -405,7 +405,7 @@ export default function KanbanBoard({ tasks: initialTasks, archives = [], curren
                             {columns.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                         {selectedTask.상태 !== '완료' && (
-                          <button onClick={() => handleStatusChange('완료')} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700" title="AI 친구의 점검 질문에 답하고 완료합니다">
+                          <button onClick={() => handleStatusChange('완료')} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700" title="비서몬의 점검 질문에 답하고 완료합니다">
                             <CheckCircle2 size={14} /> 완료하기
                           </button>
                         )}

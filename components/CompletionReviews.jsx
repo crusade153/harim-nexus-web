@@ -79,7 +79,7 @@ export default function CompletionReviews({ settings, reloadKey }) {
       <section className="min-h-80 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         {loadingDetail ? <p className="text-sm text-slate-500">기록을 불러오는 중…</p>
           : detail && !check ? <div className="py-14 text-center"><ClipboardCheck className="mx-auto text-slate-300" size={36} /><h2 className="mt-4 font-bold dark:text-white">이 업무의 완료 점검 기록이 없습니다.</h2><p className="mt-2 text-sm text-slate-500">자동화 규칙 등으로 점검 없이 완료되었거나, 아직 완료되지 않은 업무입니다.</p></div>
-          : !check ? <div className="py-14 text-center"><ClipboardCheck className="mx-auto text-indigo-300" size={36} /><h2 className="mt-4 font-bold dark:text-white">점검 기록을 선택하세요.</h2><p className="mt-2 text-sm leading-6 text-slate-500">업무를 완료하면 AI 친구가 꼭 점검할 것을 묻고,<br />답변은 여기에 저장되어 팀장이 검토합니다.</p></div>
+          : !check ? <div className="py-14 text-center"><ClipboardCheck className="mx-auto text-indigo-300" size={36} /><h2 className="mt-4 font-bold dark:text-white">점검 기록을 선택하세요.</h2><p className="mt-2 text-sm leading-6 text-slate-500">업무를 완료하면 비서몬이 꼭 점검할 것을 묻고,<br />답변은 여기에 저장되어 팀장이 검토합니다.</p></div>
           : <div className="space-y-5">
             <div>
               <Badge status={check.status} />
@@ -93,7 +93,7 @@ export default function CompletionReviews({ settings, reloadKey }) {
                 <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-indigo-50 px-3 py-2 text-sm leading-6 text-slate-700 dark:bg-indigo-950/30 dark:text-slate-200">{check.answers?.[i] || '답변 없음'}</p>
               </li>)}
             </ol>
-            <p className="text-xs text-slate-400">{check.question_source === 'ai' ? `AI 친구 질문 · ${check.model}` : '기본 점검 질문 (AI 외부 전송 없음)'}</p>
+            <p className="text-xs text-slate-400">{check.question_source === 'ai' ? '비서몬이 이 업무에 맞춰 만든 질문' : '기본 점검 질문 (외부 전송 없음)'}</p>
             {check.reviewed_at && <div className={`rounded-xl p-4 text-sm ${check.status === 'returned' ? 'bg-rose-50 text-rose-900 dark:bg-rose-950/30 dark:text-rose-200' : 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'}`}>
               <strong>{names[check.reviewed_by_member_id] || '팀장'} · {time(check.reviewed_at)}</strong>
               <p className="mt-1 whitespace-pre-wrap break-words">{check.lead_comment || '의견 없이 확인했습니다.'}</p>

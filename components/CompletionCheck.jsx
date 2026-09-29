@@ -96,7 +96,7 @@ export default function CompletionCheckHost() {
       <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="completion-check-title" className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
         <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5 dark:border-slate-800">
           <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300"><Bot size={15} /> AI 친구</p>
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300"><Bot size={15} /> 비서몬</p>
             <h2 id="completion-check-title" className="mt-1.5 text-lg font-bold text-slate-900 dark:text-white">완료하기 전에 같이 점검해 볼까요?</h2>
             {data?.task?.title && <p className="mt-1 break-words text-sm text-slate-500">{data.task.title}</p>}
           </div>
@@ -108,7 +108,7 @@ export default function CompletionCheckHost() {
               <button type="button" className="btn-secondary mt-3" onClick={() => prepare(pending.current?.taskId)}>다시 시도</button>
             </div>
           ) : !data ? (
-            <p className="flex items-center gap-2 py-10 text-sm text-slate-500"><Loader2 size={16} className="animate-spin text-indigo-500" /> AI 친구가 이 업무에서 놓치기 쉬운 걸 떠올리는 중…</p>
+            <p className="flex items-center gap-2 py-10 text-sm text-slate-500"><Loader2 size={16} className="animate-spin text-indigo-500" /> 비서몬이 이 업무에서 놓치기 쉬운 걸 떠올리는 중…</p>
           ) : (
             <>
               {data.notice && <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{data.notice}</p>}

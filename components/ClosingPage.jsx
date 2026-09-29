@@ -82,7 +82,7 @@ function RunView({ data, templateName, onChanged }) {
   const toggle = async task => {
     setBusyId(task.id)
     try {
-      // 완료는 AI 친구 점검 창을 거친다. 되돌리기(대기)는 바로 저장
+      // 완료는 비서몬 점검 창을 거친다. 되돌리기(대기)는 바로 저장
       if (task.status === '완료') {
         const { error } = await supabase.from('tasks').update({ status: '대기' }).eq('id', task.id)
         if (error) throw error

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireNexusMember, WORKSPACE_ID, checked, apiError } from '@/lib/nexus-server'
 import { runDeepSeek } from '@/lib/ai/deepseek'
 import { reviewMessages } from '@/lib/ai/prompts'
-import { tokenReservation } from '@/lib/ai/review-utils.mjs'
+import { tokenReservation, assistantMessage } from '@/lib/ai/review-utils.mjs'
 import { flushChatNotifications } from '@/lib/google-chat'
 
 export const runtime = 'nodejs'
@@ -34,7 +34,7 @@ export async function POST(request) {
     const identity = await requireNexusMember(request)
     admin = identity.admin
     const body = await request.json()
-    if (!Number.isSafeInteger(body.id) || !['run', 'answer', 'confirm'].includes(body.action)) return NextResponse.json({ error: '잘못된 AI 요청입니다.' }, { status: 400 })
+    if (!Number.isSafeInteger(body.id) || !['run', 'answer', 'confirm'].includes(body.action)) return NextResponse.json({ error: '잘못된 비서몬 요청입니다.' }, { status: 400 })
     const owned = checked(await admin.from('ai_reviews').select('id').eq('id', body.id).eq('workspace_id', WORKSPACE_ID).eq('member_id', identity.member.id).maybeSingle())
     if (!owned) return NextResponse.json({ error: '본인 검토만 처리할 수 있습니다.' }, { status: 403 })
     const transition = await admin.rpc('nexus_ai_transition', { p_id: body.id, p_member: identity.member.id, p_action: body.action, p_answers: body.answers || null })
@@ -46,7 +46,7 @@ export async function POST(request) {
       return NextResponse.json({ confirmed: true })
     }
     const settings = checked(await admin.from('workspace_settings').select('ai_enabled,ai_guidelines,ai_mask_numbers').eq('workspace_id', WORKSPACE_ID).single())
-    if (!settings.ai_enabled) throw new Error('관리자가 AI 외부 전송을 활성화해야 합니다.')
+    if (!settings.ai_enabled) throw new Error('관리자가 비서몬 외부 전송을 활성화해야 합니다.')
     const messages = checked(await admin.from('ai_review_messages').select('role,content').eq('review_id', review.id).order('id').limit(20))
     const result = await runDeepSeek(reviewMessages(review, messages, settings), review.round, {
       reserve: async input => checked(await admin.rpc('nexus_reserve_ai_call', { p_id: review.id, p_lease: review.lease_id, p_tokens: tokenReservation(input) })),
@@ -57,10 +57,10 @@ export async function POST(request) {
       },
     })
     const applied = checked(await admin.rpc('nexus_finish_ai_review', { p_id: review.id, p_lease: review.lease_id, p_result: result, p_error: null }))
-    return NextResponse.json({ applied, ...(applied ? {} : { message: '원본이 수정되어 이전 AI 결과를 반영하지 않았습니다.' }) })
+    return NextResponse.json({ applied, ...(applied ? {} : { message: '원본이 수정되어 이전 비서몬 결과를 반영하지 않았습니다.' }) })
   } catch (error) {
     if (admin && review?.lease_id) {
-      const message = error.name === 'TimeoutError' ? 'AI 응답 시간이 초과되었습니다. 저장된 기록에서 다시 시도해 주세요.' : error.message?.slice(0, 300) || 'AI 처리에 실패했습니다.'
+      const message = error.name === 'TimeoutError' ? '비서몬 응답 시간이 초과되었습니다. 저장된 기록에서 다시 시도해 주세요.' : assistantMessage(error.message?.slice(0, 300)) || '비서몬 처리에 실패했습니다.'
       await admin.rpc('nexus_finish_ai_review', { p_id: review.id, p_lease: review.lease_id, p_result: null, p_error: message })
       return NextResponse.json({ error: message, saved: true }, { status: 503 })
     }
