@@ -7,7 +7,7 @@ import {
   isSameMonth, isSaturday, isSunday, startOfMonth, startOfWeek, subMonths,
 } from 'date-fns'
 import { CalendarDays, CheckSquare, ChevronLeft, ChevronRight, Clock, Plus, Trash2, UserRound, X } from 'lucide-react'
-import { createAttendanceEvent, createSchedule, deleteAttendanceEvent } from '@/lib/sheets'
+import { createAttendanceEvent, createSchedule, deleteAttendanceEvent, deleteSchedule } from '@/lib/sheets'
 
 const ATTENDANCE_TYPES = [
   { value: 'annual_leave', label: '연차', days: 1, time: '' },
@@ -47,7 +47,7 @@ export default function CalendarPage({ schedules = [], tasks = [], attendance = 
       memberName: task.담당자명 || '미지정', title: task.제목,
     })) : []
     const regularSchedules = visible.schedule ? schedules.filter(schedule => !isLegacyAttendance(schedule)).map(schedule => ({
-      id: `schedule-${schedule.ID}`, category: 'schedule', startDate: schedule.날짜, endDate: schedule.날짜,
+      id: `schedule-${schedule.ID}`, scheduleId: schedule.ID, category: 'schedule', startDate: schedule.날짜, endDate: schedule.날짜,
       memberName: schedule.대상자 || '전체', title: schedule.내용, time: schedule.시간, scheduleType: schedule.유형,
     })) : []
     const attendanceEvents = visible.attendance ? attendance.map(item => ({
@@ -123,6 +123,12 @@ export default function CalendarPage({ schedules = [], tasks = [], attendance = 
     catch (error) { toast.error(error.message || '삭제하지 못했습니다.') }
   }
 
+  const removeSchedule = async event => {
+    if (!window.confirm(`[${event.scheduleType}] ${event.title} 일정을 삭제할까요?`)) return
+    try { await deleteSchedule(event.scheduleId, event.title); toast.success('삭제했습니다.'); await onRefresh() }
+    catch (error) { toast.error(error.message || '삭제하지 못했습니다.') }
+  }
+
   const display = event => {
     if (event.category === 'task') return { text: `[WBS] ${event.title}`, cls: 'border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300' }
     if (event.category === 'schedule') return { text: `${event.time || ''} [${event.scheduleType}] ${event.title}`, cls: ['출장', '파견'].includes(event.scheduleType) ? 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' : 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' }
@@ -163,7 +169,7 @@ export default function CalendarPage({ schedules = [], tasks = [], attendance = 
             const dateClass = holiday || isSunday(day) ? 'text-rose-500' : isSaturday(day) ? 'text-blue-500' : 'text-slate-700 dark:text-slate-300'
             return <div key={key} onClick={() => openModal(day, currentView === 'attendance' ? 'attendance' : 'schedule')} className={`group relative min-h-[108px] cursor-pointer border-b border-slate-100 p-2 hover:bg-slate-50 dark:border-slate-700/60 dark:hover:bg-slate-700/20 ${!isSameMonth(day, currentDate) ? 'bg-slate-50/50 opacity-55 dark:bg-slate-900/30' : ''}`}>
               <div className="mb-1 flex items-center justify-between"><span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${isSameDay(day, new Date()) ? 'bg-indigo-600 text-white' : dateClass}`}>{format(day, 'd')}</span>{holiday && <span className="truncate text-[9px] font-bold text-rose-500">{holiday.name}</span>}</div>
-              <div className="max-h-[84px] space-y-1 overflow-y-auto">{dayEvents.map(event => { const info = display(event); return <div key={`${event.id}-${key}`} title={event.note || event.title} onClick={e => { e.stopPropagation(); if (event.category === 'attendance') removeAttendance(event) }} className={`group/event flex items-center gap-1 truncate rounded border-l-2 px-2 py-1 text-[10px] font-medium ${info.cls}`}>{event.category === 'task' && <CheckSquare size={10} />}<span className="truncate">{info.text}</span>{event.category === 'attendance' && !event.legacy && (isAdmin || event.memberId === currentMemberId) && <Trash2 size={10} className="ml-auto hidden shrink-0 group-hover/event:block" />}</div> })}</div>
+              <div className="max-h-[84px] space-y-1 overflow-y-auto">{dayEvents.map(event => { const info = display(event); return <div key={`${event.id}-${key}`} title={event.note || event.title} onClick={e => { e.stopPropagation(); if (event.category === 'attendance') removeAttendance(event); else if (event.category === 'schedule') removeSchedule(event) }} className={`group/event flex items-center gap-1 truncate rounded border-l-2 px-2 py-1 text-[10px] font-medium ${info.cls}`}>{event.category === 'task' && <CheckSquare size={10} />}<span className="truncate">{info.text}</span>{(event.category === 'schedule' || (event.category === 'attendance' && !event.legacy && (isAdmin || event.memberId === currentMemberId))) && <Trash2 size={10} className="ml-auto hidden shrink-0 group-hover/event:block" />}</div> })}</div>
               <Plus size={14} className="absolute bottom-2 right-2 text-slate-300 opacity-0 group-hover:opacity-100" />
             </div>
           })}
