@@ -6,11 +6,11 @@ import { buildBriefText, chatWebhookConfigured, flushChatNotifications, sendChat
 import { defaultPeriod, defaultRunStart, isBusinessDay } from '@/lib/closing-utils.mjs'
 import { seoulDate } from '@/lib/weekly-utils.mjs'
 import { datesSinceLastBusinessDay } from '@/lib/recurrence.mjs'
-import { createRecurringTasks, runDueAutomations } from '@/lib/automation-server'
+import { createDueSummaryNotifications, createRecurringTasks, runDueAutomations } from '@/lib/automation-server'
 
 // Vercel Cron 매일 1회 (vercel.json, 08:40 KST).
 // 1) DB 가볍게 조회 → 무료 프로젝트 일시정지 방지
-// 2) 영업일이면: 자동 시작 월마감 생성 → 반복 템플릿 업무 생성 → 마감 도래 자동화 → 밀린 Chat 알림 전송 → 아침 브리핑(하루 1회)
+// 2) 영업일이면: 자동 시작 월마감 생성 → 반복 템플릿 업무 생성 → 마감 요약 알림 → 마감 도래 자동화 → 밀린 Chat 알림 전송 → 아침 브리핑(하루 1회)
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -51,6 +51,7 @@ export async function GET(request) {
   // 반복 템플릿 → 마감 도래 자동화 순서: 오늘 새로 만든 업무도 마감이 오늘이면 같은 실행에서 처리된다.
   const dates = datesSinceLastBusinessDay(today, holidays)
   result.recurring = await createRecurringTasks(admin, dates, today, holidays).catch(error => ({ error: error.message }))
+  result.dueSummary = await createDueSummaryNotifications(admin, dates, today).catch(error => ({ error: error.message }))
   result.dueAutomations = await runDueAutomations(admin, dates, today).catch(error => ({ error: error.message }))
 
   if (chatWebhookConfigured()) {

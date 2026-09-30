@@ -10,12 +10,13 @@ import {
 } from 'lucide-react'
 import {
   getTrash, getWorkHubData, getWorkspaceFileUrl, globalSearch,
-  markAllNotificationsRead, markNotificationRead, restoreTrashItem,
+  restoreTrashItem,
   saveGoal, updateWorkspaceSettings, uploadWorkspaceFile
 } from '@/lib/work-os'
 import { classifyDueDate } from '@/lib/work-os-utils.mjs'
 import TemplatesPanel from '@/components/TemplatesPanel'
 import AutomationPanel from '@/components/AutomationPanel'
+import NotificationsPanel from '@/components/NotificationsPanel'
 import { entityUrl, TASKS_CHANGED_EVENT } from '@/lib/links'
 
 const tabItems = [
@@ -164,7 +165,7 @@ export default function WorkHub({ initialTab = 'my', initialQuery = '', adminMod
 
       <main className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-7">
         {tab === 'my' && <MyWork tasks={tasks} />}
-        {tab === 'notifications' && <Notifications data={data} onReload={load} />}
+        {tab === 'notifications' && <NotificationsPanel notifications={data.notifications || []} onReload={load} />}
         {tab === 'search' && <SearchPanel query={query} setQuery={setQuery} searching={searching} runSearch={runSearch} results={searchResults} />}
         {tab === 'files' && <FilesPanel files={data.files || []} onReload={load} />}
         {tab === 'templates' && <TemplatesPanel templates={data.templates || []} members={data.members || []} holidays={data.holidays || []} me={data.identity.member} onReload={load} />}
@@ -191,12 +192,6 @@ function MyWork({ tasks }) {
 function TaskGroup({ title, items, tone, empty }) {
   const tones = { rose: 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300', amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300', indigo: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300' }
   return <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800"><div className="mb-4 flex items-center justify-between"><h3 className="font-bold text-slate-800 dark:text-white">{title}</h3><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${tones[tone]}`}>{items.length}</span></div><div className="space-y-2">{items.length === 0 ? <p className="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-400 dark:bg-slate-800/50">{empty}</p> : items.map(task => <Link key={task.id} href={entityUrl('task', task.id)} className="block rounded-xl border border-slate-100 p-3 transition hover:border-indigo-200 hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-indigo-950/20"><div className="flex items-start justify-between gap-3"><strong className="text-sm text-slate-800 dark:text-slate-100">{task.title}</strong><span className="shrink-0 text-[11px] text-slate-400">{formatDate(task.due_date)}</span></div><p className="mt-2 line-clamp-2 text-xs text-slate-500">{task.content || '업무 설명 없음'}</p><div className="mt-3 flex items-center gap-2 text-[11px]"><span className="rounded bg-slate-100 px-2 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{task.status}</span><span className="text-slate-400">{task.priority}</span></div></Link>)}</div></section>
-}
-
-function Notifications({ data, onReload }) {
-  const readAll = async () => { try { await markAllNotificationsRead(); toast.success('모든 알림을 확인했습니다.'); onReload() } catch (error) { toast.error(error.message) } }
-  const open = async item => { try { if (!item.read_at) await markNotificationRead(item.id); if (item.action_url) window.location.href = item.action_url; else onReload() } catch (error) { toast.error(error.message) } }
-  return <div><SectionTitle title="알림함" description="배정, 멘션, 댓글과 자동화 결과를 한곳에서 확인합니다." action={<button onClick={readAll} className="btn-secondary text-sm">모두 읽음</button>} /><div className="space-y-2">{data.notifications.length === 0 ? <Empty text="받은 알림이 없습니다." /> : data.notifications.map(item => <button key={item.id} onClick={() => open(item)} className={`w-full rounded-2xl border p-4 text-left transition hover:border-indigo-300 ${item.read_at ? 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900' : 'border-indigo-200 bg-indigo-50/60 dark:border-indigo-900 dark:bg-indigo-950/20'}`}><div className="flex gap-3"><div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.read_at ? 'bg-slate-300' : 'bg-indigo-500'}`} /><div className="min-w-0 flex-1"><div className="flex justify-between gap-3"><strong className="text-sm text-slate-800 dark:text-white">{item.title}</strong><span className="shrink-0 text-xs text-slate-400">{formatDate(item.created_at)}</span></div><p className="mt-1 line-clamp-2 text-sm text-slate-500">{item.body}</p></div></div></button>)}</div></div>
 }
 
 function SearchPanel({ query, setQuery, searching, runSearch, results }) {
