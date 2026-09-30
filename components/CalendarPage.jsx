@@ -21,7 +21,9 @@ const ATTENDANCE_TYPES = [
 ]
 const attendanceMap = Object.fromEntries(ATTENDANCE_TYPES.map(type => [type.value, type]))
 const legacyTypeMap = { 연차: 'annual_leave', 오전반차: 'am_half', 오후반차: 'pm_half', 반반차: 'quarter_day', 휴가: 'vacation', 출장: 'business_trip', 외근: 'outside_work', 휴일근로: 'holiday_work' }
-const inputClass = 'w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white'
+// 팀 일정 화면에서 등록한 '출장' 등은 세부유형이 '팀일정'이라 옛 근태 기록과 구분한다.
+const isLegacyAttendance = schedule => Boolean(legacyTypeMap[schedule.유형]) && schedule.세부유형 !== '팀일정'
+const inputClass ='w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white'
 
 export default function CalendarPage({ schedules = [], tasks = [], attendance = [], attendanceAvailable = true, members = [], currentUser, onRefresh, currentDate, onMonthChange }) {
   const [modalType, setModalType] = useState(null)
@@ -44,7 +46,7 @@ export default function CalendarPage({ schedules = [], tasks = [], attendance = 
       id: `task-${task.ID}`, category: 'task', startDate: task.마감일, endDate: task.마감일,
       memberName: task.담당자명 || '미지정', title: task.제목,
     })) : []
-    const regularSchedules = visible.schedule ? schedules.filter(schedule => !legacyTypeMap[schedule.유형]).map(schedule => ({
+    const regularSchedules = visible.schedule ? schedules.filter(schedule => !isLegacyAttendance(schedule)).map(schedule => ({
       id: `schedule-${schedule.ID}`, category: 'schedule', startDate: schedule.날짜, endDate: schedule.날짜,
       memberName: schedule.대상자 || '전체', title: schedule.내용, time: schedule.시간, scheduleType: schedule.유형,
     })) : []
@@ -54,7 +56,7 @@ export default function CalendarPage({ schedules = [], tasks = [], attendance = 
       title: attendanceMap[item.eventType]?.label || item.eventType, eventType: item.eventType,
       note: item.note, unitDays: item.unitDays,
     })) : []
-    const legacyAttendance = visible.attendance && !attendanceAvailable ? schedules.filter(schedule => legacyTypeMap[schedule.유형]).map(schedule => ({
+    const legacyAttendance = visible.attendance && !attendanceAvailable ? schedules.filter(isLegacyAttendance).map(schedule => ({
       id: `legacy-${schedule.ID}`, category: 'attendance', startDate: schedule.날짜, endDate: schedule.날짜,
       memberName: schedule.대상자, title: schedule.유형, eventType: legacyTypeMap[schedule.유형], legacy: true,
     })) : []
