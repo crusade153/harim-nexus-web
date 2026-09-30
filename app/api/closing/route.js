@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireNexusMember, WORKSPACE_ID, checked, apiError } from '@/lib/nexus-server'
 import { loadHolidays, startClosingRun } from '@/lib/closing-server'
 import { chatWebhookConfigured, flushChatNotifications, buildBriefText, sendChatMessage } from '@/lib/google-chat'
-import { defaultPeriod, defaultRunStart, normalizeHolidays } from '@/lib/closing-utils.mjs'
+import { defaultPeriod, defaultRunStart, normalizeHolidays, normalizePlant } from '@/lib/closing-utils.mjs'
 import { seoulDate } from '@/lib/weekly-utils.mjs'
 
 export const runtime = 'nodejs'
@@ -19,7 +19,7 @@ export async function GET(request) {
     const requestedRun = Number(new URL(request.url).searchParams.get('run')) || null
     const [templates, items, runs, members, holidays, settings] = await Promise.all([
       admin.from('closing_templates').select('id,name,description,active,auto_start,updated_at').eq('workspace_id', WORKSPACE_ID).order('name'),
-      admin.from('closing_template_items').select('id,template_id,title,description,offset_days,default_assignee_member_id,reference_url,sort_order').order('sort_order').limit(1000),
+      admin.from('closing_template_items').select('id,template_id,title,description,offset_days,default_assignee_member_id,reference_url,sort_order,plant').order('sort_order').limit(1000),
       admin.from('closing_runs').select('id,template_id,period,start_date,status,created_at,closed_at').eq('workspace_id', WORKSPACE_ID).order('period', { ascending: false }).limit(24),
       admin.from('workspace_members').select('member_id,members(id,name)').eq('workspace_id', WORKSPACE_ID).eq('active', true).neq('role', 'guest'),
       loadHolidays(admin),
@@ -68,7 +68,7 @@ async function saveTemplate(admin, member, body) {
     return {
       id: Number.isSafeInteger(item.id) ? item.id : null, title, description: text(item.description, 4000),
       offset_days: offset, default_assignee_member_id: Number.isSafeInteger(Number(item.default_assignee_member_id)) && item.default_assignee_member_id ? Number(item.default_assignee_member_id) : null,
-      reference_url: url || null, sort_order: index,
+      reference_url: url || null, sort_order: index, plant: normalizePlant(item.plant),
     }
   })
   const row = { name, description: text(body.description, 2000), active: body.active !== false, auto_start: body.auto_start === true, updated_at: new Date().toISOString() }
@@ -101,7 +101,7 @@ export async function POST(request) {
         return NextResponse.json({ saved: true, ...result })
       }
       case 'start_run': {
-        const result = await startClosingRun(admin, { templateId: Number(body.template_id), period: body.period, startDate: body.start_date, actorId: member.id })
+        const result = await startClosingRun(admin, { templateId: Number(body.template_id), period: body.period, startDate: body.start_date, plants: body.plants, actorId: member.id })
         const chat = await flushChatNotifications(admin).catch(error => ({ error: error.message }))
         return NextResponse.json({ ...result, chat })
       }

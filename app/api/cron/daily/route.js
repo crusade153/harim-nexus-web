@@ -50,7 +50,7 @@ export async function GET(request) {
 
   // 반복 템플릿 → 마감 도래 자동화 순서: 오늘 새로 만든 업무도 마감이 오늘이면 같은 실행에서 처리된다.
   const dates = datesSinceLastBusinessDay(today, holidays)
-  result.recurring = await createRecurringTasks(admin, dates, today).catch(error => ({ error: error.message }))
+  result.recurring = await createRecurringTasks(admin, dates, today, holidays).catch(error => ({ error: error.message }))
   result.dueAutomations = await runDueAutomations(admin, dates, today).catch(error => ({ error: error.message }))
 
   if (chatWebhookConfigured()) {

@@ -2,26 +2,46 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { ArrowDown, ArrowUp, CalendarCheck2, CheckCircle2, Circle, Loader2, MessageSquare, Plus, Settings2, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarCheck2, CheckCircle2, Circle, Copy, Loader2, MessageSquare, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { nexusApi } from '@/lib/nexus-api'
 import { entityUrl, TASKS_CHANGED_EVENT } from '@/lib/links'
 import { completeWithCheck } from '@/lib/completion-gate'
 import { requestChatFlush } from '@/lib/chat-client'
-import { businessDaysBetween, buildClosingTasks, closingProgress, defaultRunStart, isValidPeriod } from '@/lib/closing-utils.mjs'
+import {
+  businessDaysBetween, buildClosingTasks, CLOSING_PLANTS, closingProgress, closingProgressByPlant,
+  defaultRunStart, DEFAULT_PLANT, isValidPeriod, normalizePlant, parseClosingTitle
+} from '@/lib/closing-utils.mjs'
 import { seoulDate } from '@/lib/weekly-utils.mjs'
 
 const input = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white'
 const label = 'mb-1 block text-xs font-bold text-slate-500'
 const emptyTemplate = { id: null, name: '', description: '', active: true, auto_start: false, items: [] }
-const emptyItem = () => ({ key: crypto.randomUUID(), id: null, title: '', offset_days: 0, default_assignee_member_id: '', reference_url: '', description: '' })
+const emptyItem = (plant = DEFAULT_PLANT) => ({ key: crypto.randomUUID(), id: null, plant, title: '', offset_days: 0, default_assignee_member_id: '', reference_url: '', description: '' })
+const plantName = plant => (plant === DEFAULT_PLANT ? '공통' : `${plant} 공장`)
+
+// 처음 만드는 사람이 빈 화면에서 막히지 않도록 넣어 주는 예시. 자기 업무에 맞게 고쳐 쓰는 용도다.
+const SAMPLE_COMMON = [
+  { title: '월마감 일정·담당 공유', offset_days: 0 },
+  { title: '전사 원가 결산 취합', offset_days: 4 }
+]
+const SAMPLE_PLANT = [
+  { title: '생산실적 확정 확인', offset_days: 1 },
+  { title: '재고 수불·재고조사 차이 정리', offset_days: 2 },
+  { title: '제조원가 배부·정산 점검', offset_days: 3 },
+  { title: '표준원가 대비 차이 분석', offset_days: 4 }
+]
+
+function PlantChip({ active, onClick, children }) {
+  return <button type="button" onClick={onClick} aria-pressed={active} className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 text-slate-600 hover:border-indigo-300 dark:border-slate-700 dark:text-slate-300'}`}>{children}</button>
+}
 
 export default function ClosingPage() {
   const [data, setData] = useState(null)
   const [runId, setRunId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [adminTab, setAdminTab] = useState(null)
+  const [adminTab, setAdminTab] = useState('auto')
 
   const load = useCallback(async (id = runId) => {
     setLoading(true); setError('')
@@ -53,7 +73,7 @@ export default function ClosingPage() {
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-indigo-500">Monthly Closing</p>
           <h1 className="mt-1 text-2xl font-black text-slate-900 dark:text-white">월마감</h1>
-          <p className="mt-1 text-sm text-slate-500">매달 반복되는 마감 업무를 템플릿에서 자동으로 만들고, 체크만 하면 됩니다.</p>
+          <p className="mt-1 text-sm text-slate-500">플랜트(K1·K2·K3)별 마감 체크리스트를 한 번 만들어 두면, 매달 몇 번의 클릭으로 담당자별 업무가 만들어집니다.</p>
         </div>
         {data.runs.length > 0 && (
           <select value={runId || ''} onChange={e => load(Number(e.target.value))} className={`${input} w-auto`} aria-label="월마감 선택">
@@ -65,7 +85,7 @@ export default function ClosingPage() {
       {data.run ? <RunView data={data} templateName={templateName(data.run.template_id)} onChanged={() => load()} />
         : <div className="card-base p-10 text-center text-sm text-slate-500">
             <CalendarCheck2 className="mx-auto mb-3 text-slate-300" size={32} />
-            {data.isAdmin ? '아직 시작한 월마감이 없습니다. 아래에서 템플릿을 만들고 월마감을 시작하세요.' : '관리자가 월마감을 시작하면 이곳에 내 마감 항목이 표시됩니다.'}
+            {data.isAdmin ? '아직 시작한 월마감이 없습니다.' : '관리자가 월마감을 시작하면 이곳에 내 마감 항목이 표시됩니다.'}
           </div>}
 
       {data.isAdmin && <AdminPanel data={data} tab={adminTab} setTab={setAdminTab} onSaved={id => load(id)} />}
@@ -76,8 +96,18 @@ export default function ClosingPage() {
 function RunView({ data, templateName, onChanged }) {
   const { run, runTasks, previousRun, previousTasks, holidays, today, memberId, isAdmin } = data
   const [busyId, setBusyId] = useState(null)
+  const [plantFilter, setPlantFilter] = useState('all')
+  const [mineOnly, setMineOnly] = useState(false)
   const progress = closingProgress(runTasks, today)
+  const plantProgress = closingProgressByPlant(runTasks, today)
+  const showPlants = plantProgress.length > 1 || plantProgress.some(entry => entry.plant !== DEFAULT_PLANT)
   const previousByItem = new Map(previousTasks.map(t => [t.closing_item_id, t]))
+  const hasMine = runTasks.some(task => task.assignee_member_id === memberId)
+
+  const visible = runTasks.filter(task => (plantFilter === 'all' || parseClosingTitle(task.title).plant === plantFilter) && (!mineOnly || task.assignee_member_id === memberId))
+  const groups = CLOSING_PLANTS
+    .map(plant => ({ plant, tasks: visible.filter(task => parseClosingTitle(task.title).plant === plant) }))
+    .filter(group => group.tasks.length > 0)
 
   const toggle = async task => {
     setBusyId(task.id)
@@ -112,13 +142,26 @@ function RunView({ data, templateName, onChanged }) {
           </div>
         </div>
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"><div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${progress.rate}%` }} /></div>
-        {isAdmin && (
-          <div className="mt-4 flex justify-end">
-            {run.status === 'open'
-              ? <button onClick={() => setRunStatus('close_run')} className="btn-secondary text-xs">마감 완료로 표시</button>
-              : <button onClick={() => setRunStatus('reopen_run')} className="btn-secondary text-xs">다시 열기</button>}
+        {showPlants && (
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {plantProgress.map(entry => (
+              <button key={entry.plant} onClick={() => setPlantFilter(plantFilter === entry.plant ? 'all' : entry.plant)} aria-pressed={plantFilter === entry.plant} className={`rounded-xl border p-3 text-left transition ${plantFilter === entry.plant ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/20' : 'border-slate-200 hover:border-indigo-200 dark:border-slate-700'}`}>
+                <div className="flex items-center justify-between text-sm"><b className="text-slate-800 dark:text-white">{plantName(entry.plant)}</b><span className="text-xs text-slate-500">{entry.done}/{entry.total}</span></div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"><div className={`h-full rounded-full ${entry.rate === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${entry.rate}%` }} /></div>
+                {entry.overdue > 0 && <p className="mt-1.5 text-[11px] font-bold text-rose-600">지연 {entry.overdue}건</p>}
+              </button>
+            ))}
           </div>
         )}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {(showPlants || hasMine) && <PlantChip active={plantFilter === 'all' && !mineOnly} onClick={() => { setPlantFilter('all'); setMineOnly(false) }}>전체 보기</PlantChip>}
+            {hasMine && <PlantChip active={mineOnly} onClick={() => setMineOnly(!mineOnly)}>내 항목만</PlantChip>}
+          </div>
+          {isAdmin && (run.status === 'open'
+            ? <button onClick={() => setRunStatus('close_run')} className="btn-secondary text-xs">마감 완료로 표시</button>
+            : <button onClick={() => setRunStatus('reopen_run')} className="btn-secondary text-xs">다시 열기</button>)}
+        </div>
       </div>
 
       <div className="card-base overflow-x-auto">
@@ -126,29 +169,35 @@ function RunView({ data, templateName, onChanged }) {
           <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900/60">
             <tr><th className="w-12 p-3" /><th className="p-3">항목</th><th className="p-3">담당</th><th className="p-3">마감</th><th className="p-3">{previousRun ? `지난달(${previousRun.period})` : '지난달'}</th></tr>
           </thead>
-          <tbody>
-            {runTasks.map(task => {
-              const done = task.status === '완료'
-              const late = !done && task.due_date && task.due_date < today
-              const previous = previousByItem.get(task.closing_item_id)
-              const previousDay = previous?.completed_at && previousRun ? businessDaysBetween(previousRun.start_date, seoulDate(previous.completed_at), holidays) : null
-              return (
-                <tr key={task.id} className={`border-t border-slate-100 dark:border-slate-700 ${task.assignee_member_id === memberId ? 'bg-indigo-50/40 dark:bg-indigo-950/10' : ''}`}>
-                  <td className="p-3">
-                    <button onClick={() => toggle(task)} disabled={busyId === task.id} aria-label={done ? '완료 취소' : '완료로 표시'} className="text-slate-400 hover:text-indigo-600">
-                      {busyId === task.id ? <Loader2 size={20} className="animate-spin" /> : done ? <CheckCircle2 size={20} className="text-emerald-500" /> : <Circle size={20} />}
-                    </button>
-                  </td>
-                  <td className="p-3"><Link href={entityUrl('task', task.id)} className={`font-semibold hover:text-indigo-600 ${done ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100'}`}>{task.title.replace(/^\[\d{4}-\d{2} 마감\]\s*/, '')}</Link></td>
-                  <td className="p-3 text-slate-600 dark:text-slate-300">{task.assignee || <span className="text-slate-300">미정</span>}</td>
-                  <td className={`p-3 ${late ? 'font-bold text-rose-600' : 'text-slate-600 dark:text-slate-300'}`}>{task.due_date} <span className="text-xs text-slate-400">D+{businessDaysBetween(run.start_date, task.due_date, holidays)}</span>{late && ' · 지연'}</td>
-                  <td className="p-3 text-xs text-slate-500">{previous ? (previousDay !== null ? `${previousDay}영업일째 완료` : '미완료') : '-'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
+          {groups.map(group => {
+            const groupProgress = closingProgress(group.tasks, today)
+            return (
+              <tbody key={group.plant}>
+                {showPlants && <tr className="border-t border-slate-100 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/40"><td colSpan={5} className="px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300">{plantName(group.plant)} <span className="ml-1 font-normal text-slate-400">{groupProgress.done}/{groupProgress.total} 완료</span></td></tr>}
+                {group.tasks.map(task => {
+                  const done = task.status === '완료'
+                  const late = !done && task.due_date && task.due_date < today
+                  const previous = previousByItem.get(task.closing_item_id)
+                  const previousDay = previous?.completed_at && previousRun ? businessDaysBetween(previousRun.start_date, seoulDate(previous.completed_at), holidays) : null
+                  return (
+                    <tr key={task.id} className={`border-t border-slate-100 dark:border-slate-700 ${task.assignee_member_id === memberId ? 'bg-indigo-50/40 dark:bg-indigo-950/10' : ''}`}>
+                      <td className="p-3">
+                        <button onClick={() => toggle(task)} disabled={busyId === task.id} aria-label={done ? '완료 취소' : '완료로 표시'} className="text-slate-400 hover:text-indigo-600">
+                          {busyId === task.id ? <Loader2 size={20} className="animate-spin" /> : done ? <CheckCircle2 size={20} className="text-emerald-500" /> : <Circle size={20} />}
+                        </button>
+                      </td>
+                      <td className="p-3"><Link href={entityUrl('task', task.id)} className={`font-semibold hover:text-indigo-600 ${done ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100'}`}>{parseClosingTitle(task.title).label}</Link></td>
+                      <td className="p-3 text-slate-600 dark:text-slate-300">{task.assignee || <span className="text-slate-300">미정</span>}</td>
+                      <td className={`p-3 ${late ? 'font-bold text-rose-600' : 'text-slate-600 dark:text-slate-300'}`}>{task.due_date} <span className="text-xs text-slate-400">D+{businessDaysBetween(run.start_date, task.due_date, holidays)}</span>{late && ' · 지연'}</td>
+                      <td className="p-3 text-xs text-slate-500">{previous ? (previousDay !== null ? `${previousDay}영업일째 완료` : '미완료') : '-'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            )
+          })}
         </table>
-        {runTasks.length === 0 && <p className="p-8 text-center text-sm text-slate-400">항목이 없습니다.</p>}
+        {groups.length === 0 && <p className="p-8 text-center text-sm text-slate-400">{runTasks.length === 0 ? '항목이 없습니다.' : '조건에 맞는 항목이 없습니다.'}</p>}
       </div>
     </>
   )
@@ -159,18 +208,21 @@ function Stat({ label: text, value, danger }) {
 }
 
 function AdminPanel({ data, tab, setTab, onSaved }) {
-  const tabs = [['start', '새 월마감 시작'], ['template', '템플릿 관리'], ['holidays', '공휴일'], ['chat', 'Google Chat 알림']]
+  const tabs = [['template', '① 체크리스트 만들기'], ['start', '② 월마감 시작'], ['holidays', '공휴일'], ['chat', 'Google Chat 알림']]
+  // 아직 아무것도 없으면 다음에 할 일을 바로 펼쳐 준다 (직접 접으면 그대로 접힌 채로 둔다)
+  const current = tab === 'auto' ? (!data.templates.length ? 'template' : !data.runs.length ? 'start' : null) : tab
+  const toggleTab = id => setTab(current === id ? null : id)
   return (
     <section className="card-base p-5">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Settings2 size={18} className="text-slate-400" /><h2 className="mr-2 font-bold text-slate-900 dark:text-white">관리자 설정</h2>
-        {tabs.map(([id, name]) => <button key={id} onClick={() => setTab(tab === id ? null : id)} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${tab === id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>{name}</button>)}
+        {tabs.map(([id, name]) => <button key={id} onClick={() => toggleTab(id)} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${current === id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>{name}</button>)}
       </div>
-      {tab === 'start' && <StartRun data={data} onSaved={onSaved} />}
-      {tab === 'template' && <TemplateEditor data={data} onSaved={onSaved} />}
-      {tab === 'holidays' && <HolidayEditor data={data} onSaved={onSaved} />}
-      {tab === 'chat' && <ChatSettings data={data} onSaved={onSaved} />}
-      {!tab && <p className="text-sm text-slate-400">템플릿을 만든 뒤 월마감을 시작하세요. 자동 시작을 켜면 매월 첫 영업일 아침에 지난달 마감이 만들어집니다.</p>}
+      {current === 'start' && <StartRun data={data} onSaved={onSaved} />}
+      {current === 'template' && <TemplateEditor data={data} onSaved={onSaved} />}
+      {current === 'holidays' && <HolidayEditor data={data} onSaved={onSaved} />}
+      {current === 'chat' && <ChatSettings data={data} onSaved={onSaved} />}
+      {!current && <p className="text-sm text-slate-400">체크리스트는 ① 탭에서 고치고, 매달 ② 탭에서 월마감을 시작하세요. 체크리스트의 ‘자동 시작’을 켜면 매월 첫 영업일 아침에 지난달 마감이 저절로 만들어집니다.</p>}
     </section>
   )
 }
@@ -180,34 +232,46 @@ function StartRun({ data, onSaved }) {
   const [templateId, setTemplateId] = useState(active[0]?.id || '')
   const [period, setPeriod] = useState(data.defaults.period)
   const [startDate, setStartDate] = useState(data.defaults.startDate)
+  const [picked, setPicked] = useState(null)
   const [busy, setBusy] = useState(false)
-  const items = data.items.filter(i => i.template_id === Number(templateId))
-  const preview = useMemo(() => (isValidPeriod(period) && startDate ? buildClosingTasks(items, { period, startDate, holidays: data.holidays, members: data.members }) : []), [items, period, startDate, data.holidays, data.members])
+  const items = useMemo(() => data.items.filter(i => i.template_id === Number(templateId)), [data.items, templateId])
+  const plantCounts = CLOSING_PLANTS.map(plant => ({ plant, count: items.filter(i => normalizePlant(i.plant) === plant).length })).filter(entry => entry.count > 0)
+  const selected = picked ?? plantCounts.map(entry => entry.plant)
+  const chosenItems = items.filter(i => selected.includes(normalizePlant(i.plant)))
+  const preview = useMemo(() => (isValidPeriod(period) && startDate ? buildClosingTasks(chosenItems, { period, startDate, holidays: data.holidays, members: data.members }) : []), [chosenItems, period, startDate, data.holidays, data.members])
   const exists = data.runs.some(r => r.template_id === Number(templateId) && r.period === period)
+  const togglePlant = plant => setPicked(selected.includes(plant) ? selected.filter(value => value !== plant) : [...selected, plant])
 
   const start = async () => {
     setBusy(true)
     try {
-      const result = await nexusApi('/api/closing', { action: 'start_run', template_id: Number(templateId), period, start_date: startDate })
+      const result = await nexusApi('/api/closing', { action: 'start_run', template_id: Number(templateId), period, start_date: startDate, plants: selected })
       toast.success(`${period} 월마감 업무 ${result.taskCount}건을 만들고 담당자에게 알렸습니다.`)
       onSaved(result.run.id)
     } catch (e) { toast.error(e.message) } finally { setBusy(false) }
   }
 
-  if (!active.length) return <p className="text-sm text-slate-500">사용 중인 템플릿이 없습니다. '템플릿 관리'에서 먼저 만드세요.</p>
+  if (!active.length) return <p className="text-sm text-slate-500">사용 중인 체크리스트가 없습니다. ‘① 체크리스트 만들기’에서 먼저 만드세요.</p>
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <label><span className={label}>템플릿</span><select value={templateId} onChange={e => setTemplateId(e.target.value)} className={input}>{active.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-        <label><span className={label}>마감 대상월</span><input type="month" value={period} onChange={e => { setPeriod(e.target.value); if (isValidPeriod(e.target.value)) setStartDate(defaultRunStart(e.target.value, data.holidays)) }} className={input} /></label>
-        <label><span className={label}>마감 시작일 (D+0)</span><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={input} /></label>
+        <label><span className={label}>체크리스트</span><select value={templateId} onChange={e => { setTemplateId(e.target.value); setPicked(null) }} className={input}>{active.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        <label><span className={label}>마감 대상월 (몇 월 마감인가요?)</span><input type="month" value={period} onChange={e => { setPeriod(e.target.value); if (isValidPeriod(e.target.value)) setStartDate(defaultRunStart(e.target.value, data.holidays)) }} className={input} /></label>
+        <label><span className={label}>마감 시작일 (D+0, 다음 달 첫 영업일)</span><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={input} /></label>
       </div>
+      {plantCounts.length > 1 && (
+        <div>
+          <span className={label}>이번 마감에 포함할 플랜트</span>
+          <div className="flex flex-wrap gap-2">{plantCounts.map(entry => <PlantChip key={entry.plant} active={selected.includes(entry.plant)} onClick={() => togglePlant(entry.plant)}>{plantName(entry.plant)} · {entry.count}건</PlantChip>)}</div>
+          <p className="mt-1.5 text-[11px] text-slate-400">같은 달에 같은 체크리스트는 한 번만 시작할 수 있어요. 나중에 추가하려면 플랜트를 한꺼번에 골라 주세요.</p>
+        </div>
+      )}
       <div className="rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900/50">
         <p className="mb-2 text-xs font-bold text-slate-500">만들어질 업무 미리보기 ({preview.length}건)</p>
-        {preview.map(t => <div key={t.item_id} className="flex justify-between gap-3 border-t border-slate-100 py-1.5 first:border-0 dark:border-slate-800"><span className="text-slate-700 dark:text-slate-200">{t.title}</span><span className="shrink-0 text-slate-500">{t.assignee || '담당 미정'} · {t.due_date}</span></div>)}
-        {!preview.length && <p className="text-slate-400">템플릿에 항목이 없습니다.</p>}
+        {preview.map(t => <div key={t.item_id} className="flex justify-between gap-3 border-t border-slate-100 py-1.5 first:border-0 dark:border-slate-800"><span className="text-slate-700 dark:text-slate-200">{t.title.replace(/^\[\d{4}-\d{2} 마감\]\s*/, '')}</span><span className="shrink-0 text-slate-500">{t.assignee || '담당 미정'} · {t.due_date}</span></div>)}
+        {!preview.length && <p className="text-slate-400">{items.length ? '포함할 플랜트를 하나 이상 골라 주세요.' : '체크리스트에 항목이 없습니다.'}</p>}
       </div>
-      {exists && <p className="text-sm font-semibold text-rose-600">이 템플릿으로 {period} 월마감을 이미 시작했습니다.</p>}
+      {exists && <p className="text-sm font-semibold text-rose-600">이 체크리스트로 {period} 월마감을 이미 시작했습니다.</p>}
       <button onClick={start} disabled={busy || exists || !preview.length} className="btn-primary disabled:opacity-50">{busy && <Loader2 size={15} className="animate-spin" />}월마감 시작 · 업무 {preview.length}건 만들기</button>
     </div>
   )
@@ -215,26 +279,46 @@ function StartRun({ data, onSaved }) {
 
 function TemplateEditor({ data, onSaved }) {
   const toForm = template => (template
-    ? { ...template, items: data.items.filter(i => i.template_id === template.id).map(i => ({ ...i, key: `i${i.id}`, default_assignee_member_id: i.default_assignee_member_id || '', reference_url: i.reference_url || '' })) }
-    : { ...emptyTemplate, items: [emptyItem()] })
+    ? { ...template, items: data.items.filter(i => i.template_id === template.id).map(i => ({ ...i, plant: normalizePlant(i.plant), key: `i${i.id}`, default_assignee_member_id: i.default_assignee_member_id || '', reference_url: i.reference_url || '' })) }
+    : { ...emptyTemplate, name: '월마감 체크리스트', items: [] })
   const [form, setForm] = useState(() => toForm(data.templates[0]))
+  const [plant, setPlant] = useState(DEFAULT_PLANT)
   const [busy, setBusy] = useState(false)
   const setItem = (key, patch) => setForm(f => ({ ...f, items: f.items.map(i => (i.key === key ? { ...i, ...patch } : i)) }))
-  const move = (index, delta) => setForm(f => {
-    const items = [...f.items]; const target = index + delta
+  const countOf = value => form.items.filter(i => i.plant === value).length
+  const shown = form.items.filter(i => i.plant === plant)
+  const move = (key, delta) => setForm(f => {
+    const items = [...f.items]
+    const index = items.findIndex(i => i.key === key)
+    let target = index + delta
+    while (target >= 0 && target < items.length && items[target].plant !== items[index].plant) target += delta
     if (target < 0 || target >= items.length) return f
     ;[items[index], items[target]] = [items[target], items[index]]
     return { ...f, items }
   })
+  const copyTo = targetPlant => {
+    if (!shown.length) return toast.error('복사할 항목이 없습니다.')
+    if (countOf(targetPlant) && !window.confirm(`${plantName(targetPlant)}에 이미 항목이 ${countOf(targetPlant)}개 있습니다. 뒤에 이어서 복사할까요?`)) return
+    setForm(f => ({ ...f, items: [...f.items, ...shown.map(i => ({ ...i, key: crypto.randomUUID(), id: null, plant: targetPlant, default_assignee_member_id: '' }))] }))
+    toast.success(`${plantName(plant)} 항목 ${shown.length}개를 ${plantName(targetPlant)}에 복사했습니다. 플랜트마다 담당자가 다르니 담당자를 지정해 주세요.`)
+  }
+  const fillSamples = () => {
+    const made = [
+      ...SAMPLE_COMMON.map(item => ({ ...emptyItem(DEFAULT_PLANT), ...item })),
+      ...CLOSING_PLANTS.filter(value => value !== DEFAULT_PLANT).flatMap(value => SAMPLE_PLANT.map(item => ({ ...emptyItem(value), ...item })))
+    ]
+    setForm(f => ({ ...f, items: [...f.items, ...made] }))
+    toast.success('예시 항목을 넣었습니다. 내 업무에 맞게 고쳐 주세요.')
+  }
 
   const save = async () => {
     setBusy(true)
     try {
       const result = await nexusApi('/api/closing', {
         action: 'save_template', id: form.id, name: form.name, description: form.description, active: form.active, auto_start: form.auto_start,
-        items: form.items.map(i => ({ id: i.id, title: i.title, offset_days: Number(i.offset_days), default_assignee_member_id: i.default_assignee_member_id ? Number(i.default_assignee_member_id) : null, reference_url: i.reference_url, description: i.description })),
+        items: form.items.map(i => ({ id: i.id, plant: i.plant, title: i.title, offset_days: Number(i.offset_days), default_assignee_member_id: i.default_assignee_member_id ? Number(i.default_assignee_member_id) : null, reference_url: i.reference_url, description: i.description })),
       })
-      toast.success('템플릿을 저장했습니다.')
+      toast.success('체크리스트를 저장했습니다.')
       setForm(f => ({ ...f, id: result.templateId }))
       onSaved()
     } catch (e) { toast.error(e.message) } finally { setBusy(false) }
@@ -242,37 +326,61 @@ function TemplateEditor({ data, onSaved }) {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900/50 dark:text-slate-300">
+        <b className="text-slate-800 dark:text-white">이렇게 쓰세요</b> — ① 아래 탭(공통·K1·K2·K3)에서 플랜트별로 마감 전 확인할 항목을 적고 <b>D+ 며칠째</b>·<b>담당자</b>를 정합니다. ② 한 플랜트에 만든 항목은 <b>다른 플랜트로 복사</b>해 한 번에 늘릴 수 있어요. ③ 저장한 뒤 ‘② 월마감 시작’에서 달과 플랜트를 고르면 업무가 만들어집니다.
+      </div>
       <div className="flex flex-wrap gap-2">
         {data.templates.map(t => <button key={t.id} onClick={() => setForm(toForm(t))} className={`rounded-lg border px-3 py-1.5 text-sm ${form.id === t.id ? 'border-indigo-500 text-indigo-600' : 'border-slate-200 text-slate-500 dark:border-slate-700'}`}>{t.name}{!t.active && ' (중단)'}</button>)}
-        <button onClick={() => setForm(toForm(null))} className="flex items-center gap-1 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-sm text-slate-500"><Plus size={14} />새 템플릿</button>
+        <button onClick={() => setForm(toForm(null))} className="flex items-center gap-1 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-sm text-slate-500"><Plus size={14} />새 체크리스트</button>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label><span className={label}>템플릿 이름</span><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={input} placeholder="예: 월 결산" /></label>
+        <label><span className={label}>체크리스트 이름</span><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={input} placeholder="예: 월마감 체크리스트" /></label>
         <label><span className={label}>설명</span><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={input} placeholder="선택" /></label>
       </div>
       <div className="flex flex-wrap gap-5 text-sm text-slate-600 dark:text-slate-300">
         <label className="flex items-center gap-2"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} />사용 중</label>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={form.auto_start} onChange={e => setForm({ ...form, auto_start: e.target.checked })} />매월 첫 영업일 아침에 지난달 마감 자동 시작</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={form.auto_start} onChange={e => setForm({ ...form, auto_start: e.target.checked })} />매월 첫 영업일 아침에 지난달 마감 자동 시작 (모든 플랜트)</label>
       </div>
-      <div className="space-y-2">
-        <p className={label}>항목 — 마감일은 시작일(D+0)로부터 영업일 기준</p>
-        {form.items.map((item, index) => (
-          <div key={item.key} className="grid gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-[1fr_90px_140px_1fr_auto]">
-            <input value={item.title} onChange={e => setItem(item.key, { title: e.target.value })} className={input} placeholder="항목 이름 (예: 재고 수불 마감)" aria-label="항목 이름" />
-            <label className="flex items-center gap-1 text-xs text-slate-500">D+<input type="number" min={0} max={30} value={item.offset_days} onChange={e => setItem(item.key, { offset_days: e.target.value })} className={input} aria-label="영업일" /></label>
-            <select value={item.default_assignee_member_id} onChange={e => setItem(item.key, { default_assignee_member_id: e.target.value })} className={input} aria-label="기본 담당자"><option value="">담당 미정</option>{data.members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-            <input value={item.reference_url} onChange={e => setItem(item.key, { reference_url: e.target.value })} className={input} placeholder="참고 링크 (지난달 산출물 등)" aria-label="참고 링크" />
-            <div className="flex items-center gap-1">
-              <button onClick={() => move(index, -1)} className="p-1.5 text-slate-400 hover:text-slate-700" aria-label="위로"><ArrowUp size={15} /></button>
-              <button onClick={() => move(index, 1)} className="p-1.5 text-slate-400 hover:text-slate-700" aria-label="아래로"><ArrowDown size={15} /></button>
-              <button onClick={() => setForm(f => ({ ...f, items: f.items.filter(i => i.key !== item.key) }))} className="p-1.5 text-slate-400 hover:text-rose-600" aria-label="항목 삭제"><Trash2 size={15} /></button>
+
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="플랜트">
+          {CLOSING_PLANTS.map(value => <PlantChip key={value} active={plant === value} onClick={() => setPlant(value)}>{plantName(value)} · {countOf(value)}</PlantChip>)}
+          {form.items.length === 0 && <button onClick={fillSamples} className="ml-auto flex items-center gap-1 rounded-lg border border-dashed border-indigo-300 px-3 py-1.5 text-xs font-semibold text-indigo-600"><Sparkles size={13} />예시 항목으로 시작하기</button>}
+        </div>
+        <p className={label}>{plantName(plant)} 항목 — 마감일은 시작일(D+0)로부터 영업일 기준</p>
+        {shown.length === 0 && <p className="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-400 dark:border-slate-700">{plantName(plant)}에 항목이 없습니다. 아래 ‘항목 추가’로 만들거나, 다른 플랜트 탭에서 ‘복사’하세요.</p>}
+        {shown.map(item => (
+          <div key={item.key} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+            <div className="grid gap-2 md:grid-cols-[1fr_110px_160px_auto]">
+              <input value={item.title} onChange={e => setItem(item.key, { title: e.target.value })} className={input} placeholder="항목 이름 (예: 재고 수불 마감)" aria-label="항목 이름" />
+              <label className="flex items-center gap-1 text-xs text-slate-500" title="마감 시작일부터 며칠째 영업일까지">D+<input type="number" min={0} max={30} value={item.offset_days} onChange={e => setItem(item.key, { offset_days: e.target.value })} className={input} aria-label="영업일" />일째</label>
+              <select value={item.default_assignee_member_id} onChange={e => setItem(item.key, { default_assignee_member_id: e.target.value })} className={input} aria-label="기본 담당자"><option value="">담당 미정</option>{data.members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+              <div className="flex items-center gap-1">
+                <select value={item.plant} onChange={e => setItem(item.key, { plant: e.target.value })} className="rounded-lg border border-slate-200 bg-white px-1.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900" aria-label="구분 이동" title="다른 플랜트로 옮기기">{CLOSING_PLANTS.map(value => <option key={value} value={value}>{value}</option>)}</select>
+                <button onClick={() => move(item.key, -1)} className="p-1.5 text-slate-400 hover:text-slate-700" aria-label="위로"><ArrowUp size={15} /></button>
+                <button onClick={() => move(item.key, 1)} className="p-1.5 text-slate-400 hover:text-slate-700" aria-label="아래로"><ArrowDown size={15} /></button>
+                <button onClick={() => setForm(f => ({ ...f, items: f.items.filter(i => i.key !== item.key) }))} className="p-1.5 text-slate-400 hover:text-rose-600" aria-label="항목 삭제"><Trash2 size={15} /></button>
+              </div>
             </div>
-            <input value={item.description} onChange={e => setItem(item.key, { description: e.target.value })} className={`${input} md:col-span-5`} placeholder="설명·확인 방법 (선택)" aria-label="항목 설명" />
+            <details className="mt-2" open={Boolean(item.reference_url || item.description)}>
+              <summary className="cursor-pointer text-xs text-slate-400">참고 링크·설명</summary>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <input value={item.reference_url} onChange={e => setItem(item.key, { reference_url: e.target.value })} className={input} placeholder="참고 링크 (지난달 산출물 등)" aria-label="참고 링크" />
+                <input value={item.description} onChange={e => setItem(item.key, { description: e.target.value })} className={input} placeholder="설명·확인 방법 (선택)" aria-label="항목 설명" />
+              </div>
+            </details>
           </div>
         ))}
-        <button onClick={() => setForm(f => ({ ...f, items: [...f.items, emptyItem()] }))} className="btn-secondary text-sm"><Plus size={15} />항목 추가</button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => setForm(f => ({ ...f, items: [...f.items, emptyItem(plant)] }))} className="btn-secondary text-sm"><Plus size={15} />{plantName(plant)}에 항목 추가</button>
+          {shown.length > 0 && (
+            <span className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500"><Copy size={13} />이 항목들을 복사:
+              {CLOSING_PLANTS.filter(value => value !== plant).map(value => <button key={value} onClick={() => copyTo(value)} className="rounded-lg border border-slate-200 px-2.5 py-1 font-semibold hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700">{value}</button>)}
+            </span>
+          )}
+        </div>
       </div>
-      <button onClick={save} disabled={busy} className="btn-primary">{busy && <Loader2 size={15} className="animate-spin" />}템플릿 저장</button>
+      <button onClick={save} disabled={busy} className="btn-primary">{busy && <Loader2 size={15} className="animate-spin" />}체크리스트 저장 ({form.items.length}개 항목)</button>
     </div>
   )
 }
